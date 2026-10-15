@@ -1,22 +1,57 @@
 name: AdminDashboard
 options:
-  bundleIdPrefix: com.doushujun
+  bundleIdPrefix: com.doushujun.admin
   deploymentTarget:
     iOS: "16.0"
-  groupSortPosition: top
+  xcodeVersion: "15.0"
+  postGenCommand: "chmod +x Scripts/sign.sh"
+settings:
+  base:
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGNING_REQUIRED: "NO"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_IDENTITY: "-"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
 targets:
   AdminDashboard:
     type: application
     platform: iOS
-    deploymentTarget: "16.0"
     sources:
       - path: AdminDashboard
     info:
       path: AdminDashboard/Info.plist
       properties:
+        CFBundleName: 抖数君后台
         CFBundleDisplayName: 抖数君后台
-        CFBundleShortVersionString: "1.0"
+        CFBundleIdentifier: "$(PRODUCT_BUNDLE_IDENTIFIER)"
+        CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
-        UISupportedInterfaceOrientations: [Portrait]
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: LaunchScreenBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiredDeviceCapabilities:
+          - armv7
+        UIApplicationSceneManifest:
+          UIApplicationSupportsIndirectInputEvents: true
+    settings:
+      base:
+        INFOPLIST_FILE: AdminDashboard/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.doushujun.admin
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        DEVELOPMENT_TEAM: ""
+        TARGETED_DEVICE_FAMILY: "1,2"
+        PRODUCT_NAME: 抖数君后台
+      configurations:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG"
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: ""
+    dependencies: []

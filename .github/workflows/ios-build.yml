@@ -27,6 +27,8 @@ jobs:
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
+          echo "=== Available schemes ==="
+          xcodebuild -list -project AdminDashboard.xcodeproj 2>&1 | head -20
           echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
@@ -38,10 +40,12 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
-            CODE_SIGN_IDENTITY="-"
-          echo "Build exit: $?"
+            CODE_SIGN_IDENTITY="-" \
+            2>&1 | tee /tmp/build.log
+          echo "Build exit code: ${PIPESTATUS[0]}"
 
       - name: Package IPA
+        if: success() || failure()
         env:
           CODE_SIGNING_ALLOWED: "NO"
           CODE_SIGNING_REQUIRED: "NO"
@@ -49,21 +53,21 @@ jobs:
           CODE_SIGN_IDENTITY: "-"
         run: |
           echo "=== Searching for .app ==="
+          find build -name "*.app" -type d 2>/dev/null | head -5
           APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
-          echo "Found app: $APP"
           if [ -z "$APP" ]; then
-            echo "Listing build directory:"
-            find build -maxdepth 5 -type d 2>/dev/null
-            echo "ERROR: No .app found"
+            echo "ERROR: No .app found in build/"
+            ls -la build/Build/Products/ 2>/dev/null || true
+            echo "All directories in build:"
+            find build -type d 2>/dev/null | head -20
             exit 1
           fi
-          echo "=== Packaging ==="
+          echo "Found app: $APP"
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           ls -lh AdminDashboard-unsigned.ipa
-          echo "=== Done ==="
 
       - name: Upload
         uses: actions/upload-artifact@v4
