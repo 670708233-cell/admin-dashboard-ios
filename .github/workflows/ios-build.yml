@@ -5,18 +5,18 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
-  workflow_dispatch:   # 允许在 GitHub 网页手动触发
+  workflow_dispatch:
 
 jobs:
   build-device-unsigned:
-    name: Build Unsigned IPA (for Sideloadly)
+    name: Build Unsigned IPA
     runs-on: macos-14
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.app
+      # macOS-14 默认 Xcode 通常是 Xcode 15.x，无需手动指定
+      # 若构建失败可尝试改为 /Applications/Xcode_15.app 或 /Applications/Xcode_16.app
 
       - name: Install XcodeGen
         run: brew install xcodegen
@@ -24,12 +24,11 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      # ── 真机 unsigned build ──────────────────────────────
-      # CODE_SIGNING_ALLOWED=NO → 不签名，产出未签名 IPA
-      # SDK iphoneos → 真机架构
-      # -destination 'generic/platform=iOS' → 通用设备目标
       - name: Build unsigned IPA
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
         run: |
+          echo "=== XcodeGen done, building ==="
           xcodebuild \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -37,27 +36,29 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            clean build
+            clean build 2>&1 | tail -50
+          echo "=== Build exit code: $? ==="
+          # 列出产物目录
+          echo "--- Build products ---"
+          find build/Build/Products -name '*.app' -type d 2>/dev/null
+          find build/Build/Products -name '*.ipa' -type f 2>/dev/null
 
-      # ── 打包 unsigned IPA ────────────────────────────────
       - name: Package unsigned IPA
         run: |
-          # XcodeDebug-iphoneos 是实际输出目录
           APP_DIR=$(find build/Build/Products -name '*.app' -type d 2>/dev/null | head -1)
           echo "Found app: $APP_DIR"
           if [ -z "$APP_DIR" ]; then
-            echo "ERROR: No .app found. Listing build dir:"
-            ls -la build/Build/Products/
+            echo "ERROR: No .app found!"
+            ls -la build/Build/Products/ 2>/dev/null || true
+            find build -name '*.app' 2>/dev/null | head -5
             exit 1
           fi
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_DIR" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
-          ls -lh AdminDashboard-unsigned.ipa
+          echo "IPA created: $(ls -lh AdminDashboard-unsigned.ipa)"
 
-      # ── 上传 artifact ────────────────────────────────────
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
