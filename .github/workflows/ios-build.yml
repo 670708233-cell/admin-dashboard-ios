@@ -1,0 +1,67 @@
+name: iOS Build (Unsigned IPA)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:   # 允许在 GitHub 网页手动触发
+
+jobs:
+  build-device-unsigned:
+    name: Build Unsigned IPA (for Sideloadly)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      # ── 真机 unsigned build ──────────────────────────────
+      # CODE_SIGNING_ALLOWED=NO → 不签名，产出未签名 IPA
+      # SDK iphoneos → 真机架构
+      # -destination 'generic/platform=iOS' → 通用设备目标
+      - name: Build unsigned IPA
+        run: |
+          xcodebuild \
+            -project AdminDashboard.xcodeproj \
+            -scheme AdminDashboard \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            clean build
+
+      # ── 打包 unsigned IPA ────────────────────────────────
+      - name: Package unsigned IPA
+        run: |
+          # XcodeDebug-iphoneos 是实际输出目录
+          APP_DIR=$(find build/Build/Products -name '*.app' -type d 2>/dev/null | head -1)
+          echo "Found app: $APP_DIR"
+          if [ -z "$APP_DIR" ]; then
+            echo "ERROR: No .app found. Listing build dir:"
+            ls -la build/Build/Products/
+            exit 1
+          fi
+          rm -rf Payload
+          mkdir -p Payload
+          cp -R "$APP_DIR" Payload/
+          zip -qr AdminDashboard-unsigned.ipa Payload/
+          ls -lh AdminDashboard-unsigned.ipa
+
+      # ── 上传 artifact ────────────────────────────────────
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AdminDashboard-unsigned
+          path: AdminDashboard-unsigned.ipa
+          retention-days: 14
+          if-no-files-found: error

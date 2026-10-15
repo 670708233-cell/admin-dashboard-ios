@@ -1,0 +1,22 @@
+name: AdminDashboard
+options:
+  bundleIdPrefix: com.doushujun
+  deploymentTarget:
+    iOS: "16.0"
+  groupSortPosition: top
+targets:
+  AdminDashboard:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: AdminDashboard
+    info:
+      path: AdminDashboard/Info.plist
+      properties:
+        CFBundleDisplayName: 抖数君后台
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UISupportedInterfaceOrientations: [Portrait]
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
