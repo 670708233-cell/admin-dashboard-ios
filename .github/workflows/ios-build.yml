@@ -27,8 +27,6 @@ jobs:
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
-          echo "=== Project list ==="
-          xcodebuild -list -project AdminDashboard.xcodeproj || true
           echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
@@ -40,22 +38,45 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
-            CODE_SIGN_IDENTITY="-" \
-            2>&1 | tee /tmp/build.log
+            CODE_SIGN_IDENTITY="-"
           echo "Build exit: $?"
 
       - name: Package IPA
         if: success()
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_REQUIRED: "NO"
+          DEVELOPMENT_TEAM: ""
+          CODE_SIGN_IDENTITY: "-"
         run: |
           echo "=== Finding .app ==="
-          APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
-          echo "Found: $APP"
-          if [ -z "$APP" ]; then
+          # xcodebuild with -derivedDataPath build puts .app in a specific location
+          # Try multiple patterns
+          APPS=()
+          for pattern in \
+            "build/Build/Products/Debug-iphoneos/AdminDashboard.app" \
+            "build/Build/Products/Debug-iphoneos/*.app" \
+            "build/Build/Products/*.app"; do
+            matches=$(eval ls "$pattern" 2>/dev/null || true)
+            if [ -n "$matches" ]; then
+              APPS+=($matches)
+            fi
+          done
+          # Also search recursively
+          while IFS= read -r -d '' f; do
+            APPS+=("$f")
+          done < <(find build -name "*.app" -type d -print0 2>/dev/null)
+          
+          if [ ${#APPS[@]} -eq 0 ]; then
             echo "ERROR: No .app found"
-            find build -name "*.app" 2>/dev/null | head -5
-            ls -la build/Build/Products/ 2>/dev/null || true
+            echo "=== Directory structure ==="
+            find build -maxdepth 6 -type d 2>/dev/null | head -30
             exit 1
           fi
+          
+          APP="${APPS[0]}"
+          echo "Found app: $APP"
+          
           echo "=== Packaging IPA ==="
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
