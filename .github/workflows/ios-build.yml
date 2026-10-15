@@ -3,8 +3,6 @@ name: iOS Build (Unsigned IPA)
 on:
   push:
     branches: [main, master]
-  pull_request:
-    branches: [main, master]
   workflow_dispatch:
 
 jobs:
@@ -14,31 +12,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache Homebrew
+        uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: homebrew-${{ runner.os }}-${{ hashFiles('*.yml') }}
+          restore-keys: |
+            homebrew-${{ runner.os }}-
+
       - name: Install XcodeGen
         run: brew install xcodegen
 
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Show Xcode version
-        run: |
-          xcodebuild -version
-          ls /Applications/Xcode*.app 2>/dev/null || true
-
-      - name: Build unsigned IPA
+      - name: Build
         env:
           CODE_SIGNING_ALLOWED: "NO"
           CODE_SIGNING_REQUIRED: "NO"
           DEVELOPMENT_TEAM: ""
           CODE_SIGN_IDENTITY: ""
         run: |
-          set -e
-          echo "=== Starting build ==="
-          
-          # Clean first
-          rm -rf build
-          
-          # Build with explicit settings
+          echo "=== Xcode version ==="
+          xcodebuild -version
+          echo "=== SDKs ==="
+          xcodebuild -showsdks 2>/dev/null | grep iphoneos || true
+          echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -51,32 +50,26 @@ jobs:
             DEVELOPMENT_TEAM="" \
             CODE_SIGN_IDENTITY="" \
             2>&1 | tee /tmp/build.log
-          
-          echo "=== Build exit: $? ==="
-          
-          # Find the .app
-          APP=$(find build/Build/Products -name "*.app" -type d 2>/dev/null | head -1)
+          echo "Exit: $?"
+
+      - name: Package IPA
+        run: |
+          APP=$(find build/Build/Products -name "*.app" | head -1)
           if [ -z "$APP" ]; then
-            echo "ERROR: No .app found!"
+            echo "ERROR: No .app found"
             ls -la build/Build/Products/ 2>/dev/null || true
-            cat /tmp/build.log | tail -50
+            tail -30 /tmp/build.log
             exit 1
           fi
-          echo "Found app: $APP"
-          
-          # Package IPA
-          rm -rf Payload
-          mkdir Payload
+          rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
-          
-          echo "=== IPA created ==="
-          ls -lh AdminDashboard-unsigned.ipa
           rm -rf Payload
+          echo "Created: $(ls -lh AdminDashboard-unsigned.ipa)"
 
-      - name: Upload IPA
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: AdminDashboard-unsigned
           path: AdminDashboard-unsigned.ipa
-          retention-days: 14
+          retention-days: 7
