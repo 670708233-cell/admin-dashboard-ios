@@ -21,28 +21,20 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build & Archive (unsigned)
+      - name: Build & Archive (device)
         env:
-          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_STYLE: Automatic
           CODE_SIGNING_REQUIRED: "NO"
-          CODE_SIGN_IDENTITY: "-"
-          DEVELOPMENT_TEAM: ""
+          CODE_SIGNING_ALLOWED: "NO"
         run: |
-          # 列出可用 Xcode
-          echo "=== Available Xcodes ==="
-          ls -d /Applications/Xcode*.app 2>/dev/null || echo "none found"
+          echo "=== Xcode version ==="
+          xcodebuild -version
+          echo "=== Available SDKs ==="
+          xcodebuild -showsdks 2>/dev/null | grep iphoneos
+          echo "=== Available destinations ==="
+          xcodebuild -project AdminDashboard.xcodeproj -scheme AdminDashboard -showdestinations 2>/dev/null | head -20
 
-          # 选一个可用的 Xcode
-          for xc in /Applications/Xcode_16.app /Applications/Xcode_15.app /Applications/Xcode.app; do
-            if [ -d "$xc" ]; then
-              echo "Using: $xc"
-              sudo xcode-select -s "$xc/Contents/Developer"
-              xcodebuild -version
-              break
-            fi
-          done
-
-          echo "=== Starting build ==="
+          echo "=== Building for device ==="
           xcodebuild \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -50,29 +42,34 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
-            clean build 2>&1 | tail -100
+            build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            2>&1 | tee /tmp/xcodebuild.log
 
           echo "=== Exit code: ${PIPESTATUS[0]} ==="
-          echo "=== App files ==="
+          echo "=== App artifacts ==="
           find build/Build/Products -name '*.app' -type d 2>/dev/null
-          find build/Build/Products -name '*.ipa' -type f 2>/dev/null
+          ls -la build/Build/Products/Debug-iphoneos/ 2>/dev/null | head -20
 
-      - name: Package IPA
+      - name: Package unsigned IPA
         run: |
           APP_DIR=$(find build/Build/Products -name '*.app' -type d 2>/dev/null | head -1)
-          echo "App dir: $APP_DIR"
           if [ -z "$APP_DIR" ]; then
-            echo "ERROR: No .app found!"
-            ls -laR build/Build/Products/ | head -60
+            echo "ERROR: No .app found in build!"
+            echo "Contents of build/Build/Products:"
+            ls -laR build/Build/Products/ 2>/dev/null | head -40
+            cat /tmp/xcodebuild.log 2>/dev/null | tail -60
             exit 1
           fi
+          echo "Found app: $APP_DIR"
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_DIR" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
-          ls -lh AdminDashboard-unsigned.ipa
+          echo "IPA created: $(ls -lh AdminDashboard-unsigned.ipa)"
 
-      - name: Upload IPA
+      - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
           name: AdminDashboard-unsigned
