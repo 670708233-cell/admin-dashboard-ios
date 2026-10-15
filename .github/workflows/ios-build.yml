@@ -15,9 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # macOS-14 默认 Xcode 通常是 Xcode 15.x，无需手动指定
-      # 若构建失败可尝试改为 /Applications/Xcode_15.app 或 /Applications/Xcode_16.app
-
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -27,8 +24,25 @@ jobs:
       - name: Build unsigned IPA
         env:
           CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGN_IDENTITY: "-"
+          DEVELOPMENT_TEAM: ""
         run: |
-          echo "=== XcodeGen done, building ==="
+          echo "=== Step 1: xcodegen generate ==="
+          xcodegen generate
+
+          echo "=== Step 2: Find available Xcode versions ==="
+          ls /Applications/Xcode*.app 2>/dev/null || echo "No Xcode found in /Applications"
+
+          echo "=== Step 3: Build ==="
+          # 尝试多个可能的 Xcode 路径
+          for xcode in /Applications/Xcode_16.app /Applications/Xcode_15.app /Applications/Xcode.app; do
+            if [ -d "$xcode" ]; then
+              echo "Using Xcode: $xcode"
+              sudo xcode-select -s "$xcode/Contents/Developer"
+              break
+            fi
+          done
+
           xcodebuild \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -36,12 +50,11 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
-            clean build 2>&1 | tail -50
-          echo "=== Build exit code: $? ==="
-          # 列出产物目录
-          echo "--- Build products ---"
-          find build/Build/Products -name '*.app' -type d 2>/dev/null
-          find build/Build/Products -name '*.ipa' -type f 2>/dev/null
+            clean build 2>&1 | tail -80
+
+          echo "=== Build result: $? ==="
+          echo "=== Products ==="
+          find build/Build/Products -name '*.app' -o -name '*.ipa' 2>/dev/null
 
       - name: Package unsigned IPA
         run: |
@@ -50,14 +63,14 @@ jobs:
           if [ -z "$APP_DIR" ]; then
             echo "ERROR: No .app found!"
             ls -la build/Build/Products/ 2>/dev/null || true
-            find build -name '*.app' 2>/dev/null | head -5
+            find build -maxdepth 4 -name '*.app' 2>/dev/null | head -10
             exit 1
           fi
           rm -rf Payload
           mkdir -p Payload
           cp -R "$APP_DIR" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
-          echo "IPA created: $(ls -lh AdminDashboard-unsigned.ipa)"
+          ls -lh AdminDashboard-unsigned.ipa
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
