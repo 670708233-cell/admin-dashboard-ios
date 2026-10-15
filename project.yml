@@ -3,8 +3,6 @@ options:
   bundleIdPrefix: com.doushujun.admin
   deploymentTarget:
     iOS: "16.0"
-  xcodeVersion: "15.0"
-  postGenCommand: "chmod +x Scripts/sign.sh"
 settings:
   base:
     CODE_SIGNING_ALLOWED: "NO"
@@ -44,7 +42,7 @@ targets:
       base:
         INFOPLIST_FILE: AdminDashboard/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.doushujun.admin
-        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_STYLE: Manual
         CODE_SIGN_IDENTITY: "-"
         DEVELOPMENT_TEAM: ""
         TARGETED_DEVICE_FAMILY: "1,2"
