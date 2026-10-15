@@ -18,7 +18,7 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build
+      - name: Build and Package IPA
         env:
           CODE_SIGNING_ALLOWED: "NO"
           CODE_SIGNING_REQUIRED: "NO"
@@ -27,8 +27,6 @@ jobs:
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
-          echo "=== Project list ==="
-          xcodebuild -list -project AdminDashboard.xcodeproj || true
           echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
@@ -42,11 +40,8 @@ jobs:
             DEVELOPMENT_TEAM="" \
             CODE_SIGN_IDENTITY="-" \
             2>&1 | tee /tmp/build.log
-          echo "Build exit: $?"
+          echo "Build exit: ${PIPESTATUS[0]}"
 
-      - name: Package IPA
-        if: success()
-        run: |
           echo "=== Finding .app ==="
           APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
           echo "Found: $APP"
@@ -56,12 +51,14 @@ jobs:
             ls -la build/Build/Products/ 2>/dev/null || true
             exit 1
           fi
+
           echo "=== Packaging IPA ==="
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           ls -lh AdminDashboard-unsigned.ipa
+          echo "=== Done ==="
 
       - name: Upload
         uses: actions/upload-artifact@v4
