@@ -27,6 +27,8 @@ jobs:
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
+          echo "=== Project list ==="
+          xcodebuild -list -project AdminDashboard.xcodeproj || true
           echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
@@ -38,7 +40,8 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
-            CODE_SIGN_IDENTITY="-"
+            CODE_SIGN_IDENTITY="-" \
+            2>&1 | tee /tmp/build.log
           echo "Build exit: $?"
 
       - name: Package IPA
