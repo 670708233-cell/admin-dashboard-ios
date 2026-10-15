@@ -19,3 +19,13 @@ targets:
         UISupportedInterfaceOrientations: [Portrait]
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.doushujun.admin
+        TARGETED_DEVICE_FAMILY: "1,2"
+        PRODUCT_NAME: 抖数君后台
+      configurations:
+        Debug:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Release:
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: ""

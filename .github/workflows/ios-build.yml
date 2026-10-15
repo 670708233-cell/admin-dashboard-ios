@@ -20,13 +20,15 @@ jobs:
 
       - name: Build
         env:
-          CODE_SIGNING_ALLOWED: "NO"
-          CODE_SIGNING_REQUIRED: "NO"
+          CODE_SIGNING_ALLOWED: NO
+          CODE_SIGNING_REQUIRED: NO
           DEVELOPMENT_TEAM: ""
           CODE_SIGN_IDENTITY: "-"
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
+          echo "=== Project list ==="
+          xcodebuild -list -project AdminDashboard.xcodeproj || true
           echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
@@ -34,29 +36,17 @@ jobs:
             -configuration Debug \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            DEVELOPMENT_TEAM="" \
-            CODE_SIGN_IDENTITY="-"
+            -derivedDataPath build
           BUILD_EXIT=$?
           echo "Build exit: $BUILD_EXIT"
           if [ $BUILD_EXIT -ne 0 ]; then
             echo "=== Build FAILED ==="
-            tail -50 /tmp/build.log 2>/dev/null || true
             exit $BUILD_EXIT
           fi
-          echo "=== Build succeeded ==="
-          # Save build log for debugging
-          find build -name "*.app" -type d 2>/dev/null | head -3
+          echo "=== Build SUCCEEDED ==="
 
       - name: Package IPA
         if: success()
-        env:
-          CODE_SIGNING_ALLOWED: "NO"
-          CODE_SIGNING_REQUIRED: "NO"
-          DEVELOPMENT_TEAM: ""
-          CODE_SIGN_IDENTITY: "-"
         run: |
           echo "=== Finding .app ==="
           APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
