@@ -69,6 +69,64 @@ admin-dashboard-ios/
 5. **Cookie 筛选**：后端列表不支持 status 参数，iOS 与 Android 一致做本地过滤。
 6. **套餐接口**返回的是 `{status, data:[...]}` 包装（非 `{code,msg,data}`），客户端已分开处理。
 
+## 真机安装（零成本，免费 Apple ID 即可）
+
+> 无需付费开发者账号（$99/年），7 天有效期，到期重新运行脚本续期。
+
+### 前置准备
+
+1. **注册 GitHub 账号**（免费）→ [github.com/signup](https://github.com/signup)
+2. **创建仓库** → `Create a new repository`，名字 `admin-dashboard-ios`，推送本项目
+3. **创建应用专用密码** → [appleid.apple.com](https://appleid.apple.com/account/manage) → 登录与安全 → 应用专用密码 → 生成一个（格式：`abcd-efgh-ijkl-mnop`）
+4. **下载 Sideloadly** → [sideloadly.io](https://sideloadly.io)（Windows 版，免费版）
+5. **确保 iPhone 和 PC 在同一 WiFi**（局域网模式）或直接用 USB 线连接
+
+### 一键安装
+
+```powershell
+# 首次安装（自动触发 GitHub CI + 下载 IPA + 安装到手机）
+.\sideload.ps1 -AppleID "你的邮箱@gmail.com" -AppPassword "abcd-efgh-ijkl-mnop"
+
+# 续期（IPA 已保留，直接签名，约 30 秒）
+.\sideload.ps1 -SkipDownload -AppleID "你的邮箱@gmail.com" -AppPassword "新AppPassword"
+
+# 局域网安装（iPhone 显示 IP：设置 → Wi-Fi → 点击当前网络 ⓘ）
+.\sideload.ps1 -AppleID "..." -AppPassword "..." -DeviceIP "192.168.x.x"
+```
+
+### 简化批处理（双击即可）
+
+| 文件 | 用途 |
+|---|---|
+| `sideload-install.bat` | 首次安装（带提示） |
+| `sideload-refresh.bat` | 7天后续期 |
+
+```
+sideload-install.bat "your@email.com" "app-password"
+```
+
+### 工作流程
+
+```
+你触发 GitHub Actions (或自动 push)
+       │
+       ▼
+macOS 云机编译 ──► 产出 unsigned IPA
+       │
+       ▼ (sideload.ps1 下载)
+   Sideloadly + 免费 Apple ID
+       │
+       ▼
+   iPhone 安装 抖数君后台  ← 7天后过期
+```
+
+### 7 天后过期怎么办？
+
+重新运行脚本即可续期（免费 Apple ID 签名最长 7 天，这是 Apple 官方限制）：
+```
+sideload-refresh.bat "your@email.com" "新AppPassword"
+```
+
 ## 已知限制
 
 - 图表用 Swift Charts（iOS 16+），更低系统需降级替换。
