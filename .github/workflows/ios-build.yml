@@ -12,14 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Homebrew
-        uses: actions/cache@v4
-        with:
-          path: ~/Library/Caches/Homebrew
-          key: homebrew-${{ runner.os }}-${{ hashFiles('*.yml') }}
-          restore-keys: |
-            homebrew-${{ runner.os }}-
-
       - name: Install XcodeGen
         run: brew install xcodegen
 
@@ -35,8 +27,6 @@ jobs:
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
-          echo "=== SDKs ==="
-          xcodebuild -showsdks 2>/dev/null | grep iphoneos || true
           echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
@@ -52,20 +42,25 @@ jobs:
             2>&1 | tee /tmp/build.log
           echo "Exit: $?"
 
-      - name: Package IPA
+      - name: Find and Package IPA
         run: |
-          APP=$(find build/Build/Products -name "*.app" | head -1)
+          echo "=== Looking for .app ==="
+          find build -name "*.app" -type d 2>/dev/null
+          echo "=== Products directory ==="
+          ls -la build/Build/Products/ 2>/dev/null || true
+          ls -la build/Build/Products/Debug-iphoneos/ 2>/dev/null || true
+          echo "=== Packaging ==="
+          APP=$(find build -name "*.app" -type d | head -1)
           if [ -z "$APP" ]; then
-            echo "ERROR: No .app found"
-            ls -la build/Build/Products/ 2>/dev/null || true
-            tail -30 /tmp/build.log
+            echo "ERROR: No .app found in build/"
             exit 1
           fi
+          echo "Found: $APP"
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
-          echo "Created: $(ls -lh AdminDashboard-unsigned.ipa)"
+          ls -lh AdminDashboard-unsigned.ipa
 
       - name: Upload
         uses: actions/upload-artifact@v4
