@@ -23,7 +23,7 @@ jobs:
           CODE_SIGNING_ALLOWED: "NO"
           CODE_SIGNING_REQUIRED: "NO"
           DEVELOPMENT_TEAM: ""
-          CODE_SIGN_IDENTITY: ""
+          CODE_SIGN_IDENTITY: "-"
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
@@ -38,24 +38,49 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
-            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_IDENTITY="-" \
             2>&1 | tee /tmp/build.log
-          echo "Exit: $?"
+          echo "Build exit: $?"
 
-      - name: Find and Package IPA
+      - name: Find app and package IPA
         run: |
-          echo "=== Looking for .app ==="
-          find build -name "*.app" -type d 2>/dev/null
-          echo "=== Products directory ==="
-          ls -la build/Build/Products/ 2>/dev/null || true
-          ls -la build/Build/Products/Debug-iphoneos/ 2>/dev/null || true
-          echo "=== Packaging ==="
-          APP=$(find build -name "*.app" -type d | head -1)
-          if [ -z "$APP" ]; then
-            echo "ERROR: No .app found in build/"
+          echo "=== Searching for .app ==="
+          find build -name "*.app" 2>/dev/null
+          echo "=== All directories in build/Build/Products ==="
+          find build/Build/Products -maxdepth 3 -type d 2>/dev/null
+          echo "=== Attempting alternative package ==="
+          # xcodebuild with -archivePath for Archive approach
+          xcodebuild archive \
+            -project AdminDashboard.xcodeproj \
+            -scheme AdminDashboard \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/AdminDashboard.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM="" \
+            CODE_SIGN_IDENTITY="-" \
+            2>&1 | tee /tmp/archive.log
+          echo "Archive exit: $?"
+          echo "=== Archive contents ==="
+          ls -la build/AdminDashboard.xcarchive/ 2>/dev/null || true
+          ls -la build/AdminDashboard.xcarchive/Products/ 2>/dev/null || true
+
+      - name: Create IPA from archive
+        run: |
+          ARCHIVE="build/AdminDashboard.xcarchive"
+          if [ ! -d "$ARCHIVE" ]; then
+            echo "ERROR: Archive not found at $ARCHIVE"
             exit 1
           fi
-          echo "Found: $APP"
+          APP="$ARCHIVE/Products/Applications/AdminDashboard.app"
+          if [ ! -d "$APP" ]; then
+            echo "ERROR: App not found in archive"
+            find "$ARCHIVE" -name "*.app" 2>/dev/null
+            exit 1
+          fi
+          echo "Found app: $APP"
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
