@@ -21,28 +21,28 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build unsigned IPA
+      - name: Build & Archive (unsigned)
         env:
           CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_REQUIRED: "NO"
           CODE_SIGN_IDENTITY: "-"
           DEVELOPMENT_TEAM: ""
         run: |
-          echo "=== Step 1: xcodegen generate ==="
-          xcodegen generate
+          # 列出可用 Xcode
+          echo "=== Available Xcodes ==="
+          ls -d /Applications/Xcode*.app 2>/dev/null || echo "none found"
 
-          echo "=== Step 2: Find available Xcode versions ==="
-          ls /Applications/Xcode*.app 2>/dev/null || echo "No Xcode found in /Applications"
-
-          echo "=== Step 3: Build ==="
-          # 尝试多个可能的 Xcode 路径
-          for xcode in /Applications/Xcode_16.app /Applications/Xcode_15.app /Applications/Xcode.app; do
-            if [ -d "$xcode" ]; then
-              echo "Using Xcode: $xcode"
-              sudo xcode-select -s "$xcode/Contents/Developer"
+          # 选一个可用的 Xcode
+          for xc in /Applications/Xcode_16.app /Applications/Xcode_15.app /Applications/Xcode.app; do
+            if [ -d "$xc" ]; then
+              echo "Using: $xc"
+              sudo xcode-select -s "$xc/Contents/Developer"
+              xcodebuild -version
               break
             fi
           done
 
+          echo "=== Starting build ==="
           xcodebuild \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -50,20 +50,20 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
-            clean build 2>&1 | tail -80
+            clean build 2>&1 | tail -100
 
-          echo "=== Build result: $? ==="
-          echo "=== Products ==="
-          find build/Build/Products -name '*.app' -o -name '*.ipa' 2>/dev/null
+          echo "=== Exit code: ${PIPESTATUS[0]} ==="
+          echo "=== App files ==="
+          find build/Build/Products -name '*.app' -type d 2>/dev/null
+          find build/Build/Products -name '*.ipa' -type f 2>/dev/null
 
-      - name: Package unsigned IPA
+      - name: Package IPA
         run: |
           APP_DIR=$(find build/Build/Products -name '*.app' -type d 2>/dev/null | head -1)
-          echo "Found app: $APP_DIR"
+          echo "App dir: $APP_DIR"
           if [ -z "$APP_DIR" ]; then
             echo "ERROR: No .app found!"
-            ls -la build/Build/Products/ 2>/dev/null || true
-            find build -maxdepth 4 -name '*.app' 2>/dev/null | head -10
+            ls -laR build/Build/Products/ | head -60
             exit 1
           fi
           rm -rf Payload
@@ -72,7 +72,7 @@ jobs:
           zip -qr AdminDashboard-unsigned.ipa Payload/
           ls -lh AdminDashboard-unsigned.ipa
 
-      - name: Upload unsigned IPA
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: AdminDashboard-unsigned
