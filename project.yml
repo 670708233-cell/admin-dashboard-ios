@@ -3,13 +3,6 @@ options:
   bundleIdPrefix: com.doushujun.admin
   deploymentTarget:
     iOS: "16.0"
-settings:
-  base:
-    CODE_SIGNING_ALLOWED: "NO"
-    CODE_SIGNING_REQUIRED: "NO"
-    DEVELOPMENT_TEAM: ""
-    CODE_SIGN_IDENTITY: "-"
-    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
 targets:
   AdminDashboard:
     type: application
@@ -25,8 +18,6 @@ targets:
         CFBundleShortVersionString: "1.0.0"
         CFBundleVersion: "1"
         LSRequiresIPhoneOS: true
-        UILaunchScreen:
-          UIColorName: LaunchScreenBackground
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         UISupportedInterfaceOrientations~ipad:
@@ -40,16 +31,12 @@ targets:
           UIApplicationSupportsIndirectInputEvents: true
     settings:
       base:
-        INFOPLIST_FILE: AdminDashboard/Info.plist
         PRODUCT_BUNDLE_IDENTIFIER: com.doushujun.admin
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: "-"
-        DEVELOPMENT_TEAM: ""
         TARGETED_DEVICE_FAMILY: "1,2"
         PRODUCT_NAME: 抖数君后台
       configurations:
         Debug:
-          SWIFT_ACTIVE_COMPILATION_CONDITIONS: "DEBUG"
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
         Release:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: ""
     dependencies: []
