@@ -8,9 +8,7 @@ set DEVICE_IP=%~3
 set IPA_PATH=%~4
 
 if "%APPLE_ID%"=="" (
-    echo 错误：缺少 Apple ID 参数
-    echo.
-    echo 用法: sideload-refresh.bat ^<AppleID^> ^<AppPassword^> [DeviceIP] [IPAPath]
+    echo 用法: sideload-refresh.bat ^<AppleID^> ^<AppPassword^> [DeviceIP]
     echo.
     echo 示例:
     echo   sideload-refresh.bat myemail@gmail.com abcd-efgh-ijkl-mnop
@@ -20,12 +18,12 @@ if "%APPLE_ID%"=="" (
 )
 
 if "%APP_PASSWORD%"=="" (
-    echo 错误：缺少 App Password 参数
+    echo 错误：缺少 App Password
     pause
     exit /b 1
 )
 
-powershell -ExecutionPolicy Bypass -File "%~dp0sideload.ps1" -AppleID "%APPLE_ID%" -AppPassword "%APP_PASSWORD%" %if defined DEVICE_IP% -DeviceIP "%DEVICE_IP%" %if not defined IPA_PATH% -SkipDownload%if defined IPA_PATH% -IPAPath "%IPA_PATH%"
+powershell -ExecutionPolicy Bypass -File "%~dp0sideload.ps1" -AppleID "%APPLE_ID%" -AppPassword "%APP_PASSWORD%" %if defined DEVICE_IP%-DeviceIP "%DEVICE_IP%" %if not defined IPA_PATH%-SkipDownload%if defined IPA_PATH%-IPAPath "%IPA_PATH%"
 
 endlocal
 pause
