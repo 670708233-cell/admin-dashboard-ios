@@ -18,17 +18,15 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build and Package IPA
+      - name: Build
         env:
           CODE_SIGNING_ALLOWED: "NO"
           CODE_SIGNING_REQUIRED: "NO"
           DEVELOPMENT_TEAM: ""
           CODE_SIGN_IDENTITY: "-"
         run: |
-          set -e
           echo "=== Xcode version ==="
           xcodebuild -version
-          
           echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
@@ -41,43 +39,40 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
             CODE_SIGN_IDENTITY="-"
-          
-          echo "=== Build completed ==="
-          
-          # Find the .app
+          echo "Build exit: $?"
+
+      - name: Package IPA
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_REQUIRED: "NO"
+          DEVELOPMENT_TEAM: ""
+          CODE_SIGN_IDENTITY: "-"
+        run: |
+          echo "=== Finding .app ==="
           APP=""
           if [ -d "build/Build/Products/Debug-iphoneos" ]; then
-            APP="build/Build/Products/Debug-iphoneos/AdminDashboard.app"
-            if [ ! -d "$APP" ]; then
-              APP=$(ls build/Build/Products/Debug-iphoneos/*.app 2>/dev/null | head -1)
-            fi
+            for candidate in build/Build/Products/Debug-iphoneos/*.app; do
+              if [ -d "$candidate" ]; then
+                APP="$candidate"
+                break
+              fi
+            done
           fi
-          
-          if [ -z "$APP" ] || [ ! -d "$APP" ]; then
-            echo "Trying fallback search..."
+          if [ -z "$APP" ]; then
             APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
           fi
-          
-          echo "Found app: $APP"
-          
-          if [ -z "$APP" ] || [ ! -d "$APP" ]; then
-            echo "ERROR: No .app found!"
-            echo "=== Directory listing ==="
-            ls -laR build/Build/Products/ 2>/dev/null || true
-            find build -name "*.app" 2>/dev/null || true
+          echo "Found: $APP"
+          if [ -z "$APP" ]; then
+            echo "ERROR: No .app found"
+            find build -type d -maxdepth 5 2>/dev/null | head -20
             exit 1
           fi
-          
-          # Package IPA
-          echo "=== Packaging IPA ==="
+          echo "=== Packaging ==="
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
-          
-          echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
-          unzip -l AdminDashboard-unsigned.ipa | head -10
 
       - name: Upload
         uses: actions/upload-artifact@v4
