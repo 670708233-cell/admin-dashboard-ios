@@ -347,7 +347,7 @@ struct LabeledField: View {
             }
             .keyboardType(keyboard)
             .focused($focused)
-            .textFieldStyle(TechFieldStyle(isFocused: focused))
+            .modifier(TechFieldStyle(isFocused: focused))
         }
     }
 }
