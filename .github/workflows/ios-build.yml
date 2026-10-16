@@ -25,6 +25,7 @@ jobs:
 
       - name: Build
         id: build
+        continue-on-error: true
         run: |
           set -o pipefail
           xcodebuild build \
@@ -36,55 +37,35 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             2>&1 | tee build.log
-          
-          echo "Build exit code: ${PIPESTATUS[0]}"
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Check Build Result
-        id: check
-        run: |
-          if [ "${{ steps.build.outputs.exit_code }}" != "0" ]; then
-            echo "BUILD FAILED with exit code ${{ steps.build.outputs.exit_code }}"
-            echo "error=true" >> "$GITHUB_OUTPUT"
-            
-            echo "=== Build log tail ==="
-            tail -150 build.log
-          else
-            echo "BUILD SUCCEEDED"
-            echo "error=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Create Public Gist on Failure
-        if: steps.check.outputs.error == 'true'
+      - name: Create Issue on Failure
+        if: steps.build.outputs.exit_code != '0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Creating public gist with build error ==="
+          echo "=== Creating public issue with build error ==="
           
-          # Create a summary file
-          cat > gist-summary.md << EOF
-          # iOS Build Error
+          # Truncate build log to 4000 chars (GitHub issue body limit is ~65536)
+          LOG_PART=$(head -100 build.log | head -c 4000)
           
-          **Run:** ${{ github.run_id }}
+          gh issue create \
+            --title "iOS Build Failed - Run ${{ github.run_id }}" \
+            --body "## Build Error
+          
+          **Run ID:** ${{ github.run_id }}
           **Commit:** ${{ github.sha }}
-          **Branch:** ${{ github.ref_name }}
+          **Exit Code:** ${{ steps.build.outputs.exit_code }}
           
-          ## Error
-          
-          Build failed with exit code ${{ steps.build.outputs.exit_code }}
-          
-          ## Build Log (last 200 lines)
+          ### Build Log (first 100 lines)
           
           \`\`\`
-          $(tail -200 build.log)
-          \`\`\`
-          EOF
+          $LOG_PART
+          \`\`\n
           
-          # Create gist
-          gh gist create gist-summary.md --public \
-            --filename "build-error.md" \
-            --description "iOS Build Error - Run ${{ github.run_id }}" \
-            || echo "Failed to create gist"
+          ### Full Log
+          See [Actions](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+            --repo ${{ github.repository }} || echo "Failed to create issue"
 
       - name: Package IPA
         if: success()
@@ -96,15 +77,11 @@ jobs:
             exit 1
           fi
           
-          echo "Packaging: $APP"
-          du -sh "$APP"
-          
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           
-          echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
 
       - name: Upload IPA
