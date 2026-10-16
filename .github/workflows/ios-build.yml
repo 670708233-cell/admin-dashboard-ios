@@ -22,6 +22,7 @@ jobs:
 
       - name: Clean and Build
         id: build
+        continue-on-error: true
         run: |
           echo "=== Cleaning ==="
           rm -rf build
@@ -42,8 +43,15 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             2>&1 | tee build.log
           
-          echo "Build exit code: ${PIPESTATUS[0]}"
-          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "Build exit code: $EXIT_CODE"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          
+          # Show error summary
+          if [ $EXIT_CODE != 0 ]; then
+            echo "=== BUILD FAILED ==="
+            grep -E "(error:|BUILD FAILED)" build.log | head -30
+          fi
 
       - name: Find App
         if: always()
@@ -52,16 +60,24 @@ jobs:
           find build -name "*.app" -type d 2>/dev/null | while read app; do
             echo "Found: $app"
             du -sh "$app"
-            ls -la "$app" | head -10
           done
           
           echo ""
           echo "=== Build Products ==="
           find build/Build/Products -type f 2>/dev/null | head -20
-          
-          echo ""
-          echo "=== Build Log Summary ==="
-          grep -E "(BUILD SUCCEEDED|BUILD FAILED|error:)" build.log 2>/dev/null | head -20 || true
+
+      - name: Create Gist on Failure
+        if: steps.build.outputs.exit_code != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=== Creating gist with error ==="
+          cat build.log > /tmp/build.log
+          gh gist create /tmp/build.log \
+            --public \
+            --filename "build-error.log" \
+            --description "iOS Build Error - Run ${{ github.run_id }}" \
+            --url-only || echo "Failed to create gist"
 
       - name: Package IPA
         if: success()
@@ -69,39 +85,17 @@ jobs:
           echo "=== Packaging IPA ==="
           APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           
-          echo "App path: $APP"
-          
           if [ -z "$APP" ]; then
             echo "ERROR: No AdminDashboard.app found!"
-            echo "Available .app files:"
-            find build -name "*.app" -type d 2>/dev/null
             exit 1
           fi
           
-          echo "Found app: $APP"
-          echo "App size:"
-          du -sh "$APP"
-          echo "App contents:"
-          ls -la "$APP" | head -15
-          
-          # Check binary
-          if [ -f "$APP/AdminDashboard" ]; then
-            echo "Binary exists:"
-            file "$APP/AdminDashboard"
-            ls -lh "$APP/AdminDashboard"
-          else
-            echo "WARNING: No binary in .app"
-          fi
-          
-          # Package IPA
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           
-          echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
-          unzip -l AdminDashboard-unsigned.ipa | head -20
 
       - name: Upload IPA
         if: success()
