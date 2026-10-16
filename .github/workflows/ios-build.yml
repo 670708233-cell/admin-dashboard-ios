@@ -23,6 +23,11 @@ jobs:
           echo "=== Building with xcodebuild ==="
           set -o pipefail
           
+          echo "=== Environment ==="
+          which xcodebuild
+          ls -la /Applications/ | grep -i xcode || echo "NO XCODE IN APPLICATIONS"
+          xcodebuild -version 2>&1 || echo "XCODEBUILD VERSION FAILED"
+          
           # Try building with explicit destination (Xcode 15 compatible)
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
