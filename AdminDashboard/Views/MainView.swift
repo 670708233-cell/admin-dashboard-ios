@@ -77,6 +77,9 @@ struct MainView: View {
                 .frame(maxWidth: .infinity)
                 .allowsHitTesting(false)
             }
+
+            // TODO 临时几何调试（定位窗口尺寸异常后删除）
+            GeomDebugView()
         }
         .animation(.spring(), value: drawerOpen)
         .sheet(isPresented: $showChangePwd) {
@@ -253,6 +256,44 @@ struct ChangePasswordSheet: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }.foregroundColor(Tech.cyan)
                 }
+            }
+        }
+    }
+}
+
+/// 临时几何调试覆盖层（定位窗口尺寸异常后删除）
+private struct GeomDebugView: View {
+    @State private var winInfo = "win: ?"
+    @State private var screenInfo = "screen: ?"
+
+    var body: some View {
+        GeometryReader { geo in
+            VStack(alignment: .leading, spacing: 2) {
+                Text("geo: \(Int(geo.size.width))x\(Int(geo.size.height))")
+                Text("safe: \(Int(geo.safeAreaInsets.leading)),\(Int(geo.safeAreaInsets.top))")
+                Text(screenInfo)
+                Text(winInfo)
+            }
+            .font(.system(size: 10, weight: .semibold, design: .monospaced))
+            .foregroundColor(.yellow)
+            .padding(6)
+            .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.65)))
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+            .onAppear { refresh() }
+            .onTapGesture { refresh() }
+        }
+        .allowsHitTesting(true)
+    }
+
+    private func refresh() {
+        screenInfo = "UIScreen: \(UIScreen.main.bounds.size) @\(UIScreen.main.scale)x"
+        DispatchQueue.main.async {
+            let scene = UIApplication.shared.connectedScenes.first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene
+                ?? UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.first
+            let win = scene?.keyWindow ?? scene?.windows.first
+            winInfo = "win: \(win?.frame ?? .zero) trait:\(win?.traitCollection.horizontalSizeClass == .regular ? "R" : "C")"
+            if let scene {
+                screenInfo = "screen: \(scene.screen.bounds.size) @\(scene.screen.scale)x"
             }
         }
     }
