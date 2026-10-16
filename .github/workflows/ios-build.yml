@@ -20,14 +20,21 @@ jobs:
       - name: Generate Xcode project
         run: python3 generate_project.py
 
-      - name: Verify Project
-        run: xcodebuild -list -project AdminDashboard.xcodeproj
+      - name: Clean Derived Data
+        run: |
+          echo "=== Cleaning DerivedData ==="
+          rm -rf ~/Library/Developer/Xcode/DerivedData
+          rm -rf build
+          mkdir -p build
 
-      - name: Build
+      - name: Build with Verbose Output
         id: build
         continue-on-error: true
         run: |
+          echo "=== Starting build ==="
           set -o pipefail
+          
+          # Use xcodebuild with build-for-testing to force compilation
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -36,43 +43,56 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             2>&1 | tee build.log
           
-          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "Build exit code: $EXIT_CODE"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          
+          # Show compilation summary
+          echo ""
+          echo "=== Compilation Summary ==="
+          grep -c "CompileSwift" build.log 2>/dev/null || echo "0"
+          grep "BUILD SUCCEEDED\|BUILD FAILED" build.log 2>/dev/null || echo "No summary found"
 
-      - name: Inspect Build
+      - name: Inspect Results
         if: always()
         run: |
-          echo "=== BUILD LOG (last 200 lines) ==="
-          tail -200 build.log 2>/dev/null || echo "No build.log"
+          echo "=== Build Exit Code: ${{ steps.build.outputs.exit_code }} ==="
           
           echo ""
-          echo "=== APP SEARCH ==="
-          find build -name "*.app" -type d 2>/dev/null || echo "No .app found"
+          echo "=== Build Log (last 100 lines) ==="
+          tail -100 build.log 2>/dev/null || echo "No build.log"
           
           echo ""
-          echo "=== PRODUCTS DIR ==="
-          ls -la build/Build/Products/ 2>/dev/null || echo "No Products dir"
+          echo "=== Searching for .app ==="
+          find build -name "*.app" -type d 2>/dev/null | while read app; do
+            echo "Found: $app"
+            du -sh "$app"
+            ls -la "$app" | head -10
+          done
+          
+          echo ""
+          echo "=== DerivedData structure ==="
+          find build -maxdepth 5 -type d 2>/dev/null | head -30
 
-      - name: Create Gist on Failure
+      - name: Create Gist with Error
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Creating gist ==="
-          echo "Build log:"
-          cat build.log 2>/dev/null || echo "No log"
-          
-          # Create gist with build log
+          echo "=== Creating gist with build error ==="
           gh gist create build.log \
             --public \
-            --filename "build-log-run-${{ github.run_id }}.log" \
+            --filename "build-error.log" \
             --description "iOS Build Error - Run ${{ github.run_id }}" \
-            --url-only || echo "Gist creation failed"
+            --url-only || echo "Failed to create gist"
 
       - name: Package IPA
         if: success()
         run: |
+          echo "=== Packaging IPA ==="
           APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           
           if [ -z "$APP" ]; then
@@ -80,11 +100,15 @@ jobs:
             exit 1
           fi
           
+          echo "Found: $APP"
+          du -sh "$APP"
+          
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           
+          echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
 
       - name: Upload IPA
