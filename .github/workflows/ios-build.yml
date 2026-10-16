@@ -37,16 +37,35 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             2>&1 | tee build.log
-          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          
+          EXIT_CODE=${PIPESTATUS[0]}
+          echo "Exit code: $EXIT_CODE"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Check Build Status
+        if: always()
+        run: |
+          echo "Build exit code: ${{ steps.build.outputs.exit_code }}"
+          
+          if [ "${{ steps.build.outputs.exit_code }}" != "0" ]; then
+            echo "BUILD FAILED"
+            echo "error=true" >> "$GITHUB_ENV"
+            
+            # Show error
+            echo "=== Build log tail ==="
+            tail -100 build.log
+          else
+            echo "BUILD SUCCEEDED"
+            echo "error=false" >> "$GITHUB_ENV"
+          fi
 
       - name: Create Issue on Failure
-        if: steps.build.outputs.exit_code != '0'
+        if: env.error == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Creating public issue with build error ==="
+          echo "=== Creating public issue ==="
           
-          # Truncate build log to 4000 chars (GitHub issue body limit is ~65536)
           LOG_PART=$(head -100 build.log | head -c 4000)
           
           gh issue create \
@@ -54,17 +73,12 @@ jobs:
             --body "## Build Error
           
           **Run ID:** ${{ github.run_id }}
-          **Commit:** ${{ github.sha }}
           **Exit Code:** ${{ steps.build.outputs.exit_code }}
           
-          ### Build Log (first 100 lines)
-          
+          ### Build Log
           \`\`\`
           $LOG_PART
-          \`\`\n
-          
-          ### Full Log
-          See [Actions](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" \
+          \`\`\`" \
             --repo ${{ github.repository }} || echo "Failed to create issue"
 
       - name: Package IPA
@@ -73,7 +87,7 @@ jobs:
           APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           
           if [ -z "$APP" ]; then
-            echo "ERROR: AdminDashboard.app not found!"
+            echo "ERROR: No .app found!"
             exit 1
           fi
           
