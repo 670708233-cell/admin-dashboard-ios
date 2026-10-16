@@ -12,16 +12,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install XcodeGen
-        run: brew install xcodegen
-
       - name: Generate Xcode project
-        run: xcodegen generate
+        run: python3 generate_project.py
 
       - name: Build
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
+          
+          echo "=== Project structure ==="
+          ls -la AdminDashboard.xcodeproj/
           
           echo "=== Building with xcodebuild ==="
           xcodebuild build \
