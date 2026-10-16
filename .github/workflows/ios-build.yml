@@ -22,7 +22,6 @@ jobs:
 
       - name: Clean and Build
         id: build
-        continue-on-error: true
         run: |
           echo "=== Cleaning ==="
           rm -rf build
@@ -44,6 +43,11 @@ jobs:
           EXIT_CODE=${PIPESTATUS[0]}
           echo "Build exit code: $EXIT_CODE"
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          
+          grep -q "BUILD SUCCEEDED" build.log || {
+            echo "ERROR: BUILD SUCCEEDED not found in log"
+            exit 1
+          }
 
       - name: Find App
         if: always()
@@ -61,7 +65,6 @@ jobs:
 
       - name: Package IPA
         id: package
-        continue-on-error: true
         run: |
           echo "=== Packaging IPA ==="
           APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
@@ -102,22 +105,6 @@ jobs:
             ls -la *.ipa 2>/dev/null || echo "No .ipa files"
             exit 1
           fi
-
-      - name: Create Gist on Failure
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "=== Creating gist ==="
-          echo "Build exit code: ${{ steps.build.outputs.exit_code }}"
-          echo "Package outcome: ${{ steps.package.outcome }}"
-          
-          # Create gist with build log
-          gh gist create build.log \
-            --public \
-            --filename "build-error.log" \
-            --description "iOS Build Error - Run ${{ github.run_id }}" \
-            || echo "Failed to create gist"
 
       - name: Upload IPA
         if: steps.package.outcome == 'success'

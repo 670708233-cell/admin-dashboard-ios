@@ -56,15 +56,19 @@ root_gid = gen_id("group:ROOT")
 groups[""] = (root_gid, [])
 
 # Process files
+# NOTE: Info.plist must NOT get a PBXBuildFile entry and must NOT be in any
+# build phase. INFOPLIST_FILE handles it via ProcessInfoPlistFile; adding it
+# to Resources causes "Multiple commands produce '<app>/Info.plist'".
 all_files = swift_files + plist_files
 for f in all_files:
     # File reference
     fid = gen_id("file:" + f)
     file_refs[f] = fid
-    
-    # Build file reference
-    bid = gen_id("build:" + f)
-    build_files[f] = bid
+
+    # Build file reference (Swift sources only; Info.plist excluded on purpose)
+    if f.endswith(".swift"):
+        bid = gen_id("build:" + f)
+        build_files[f] = bid
     
     # Group path
     parts = f.split("/")
@@ -103,15 +107,12 @@ for f, fid in sorted(file_refs.items()):
 lines.append("/* End PBXFileReference section */")
 lines.append("")
 
-# PBXBuildFile section - separate Swift files and plist files
+# PBXBuildFile section - Swift sources only (Info.plist has no build file)
 lines.append("/* Begin PBXBuildFile section */")
 for f, bid in sorted(build_files.items()):
     fid = file_refs[f]
     basename = os.path.basename(f)
-    if f.endswith(".swift"):
-        lines.append(f"\t\t{bid} /* {basename} in Sources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
-    elif f.endswith(".plist"):
-        lines.append(f"\t\t{bid} /* {basename} in Resources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
+    lines.append(f"\t\t{bid} /* {basename} in Sources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
 lines.append("/* End PBXBuildFile section */")
 lines.append("")
 
@@ -227,16 +228,13 @@ lines.append("\t\t};")
 lines.append("/* End PBXProject section */")
 lines.append("")
 
-# PBXResourcesBuildPhase section - INCLUDE Info.plist
+# PBXResourcesBuildPhase section - empty; Info.plist is handled by
+# INFOPLIST_FILE (ProcessInfoPlistFile), NOT by a copy command here.
 lines.append("/* Begin PBXResourcesBuildPhase section */")
 lines.append(f"\t\t{res_phase_id} /* Resources */ = {{")
 lines.append("\t\t\tisa = PBXResourcesBuildPhase;")
 lines.append("\t\t\tbuildActionMask = 2147483647;")
 lines.append("\t\t\tfiles = (")
-# Add Info.plist to resources
-for pf in plist_files:
-    bid = build_files[pf]
-    lines.append(f"\t\t\t\t{bid} /* {os.path.basename(pf)} in Resources */,")
 lines.append("\t\t\t);")
 lines.append("\t\t\trunOnlyForDeploymentPostprocessing = 0;")
 lines.append("\t\t};")
