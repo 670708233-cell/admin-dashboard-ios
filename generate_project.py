@@ -80,7 +80,7 @@ lines.append("{")
 lines.append("\tarchiveVersion = 1;")
 lines.append("\tclasses = {")
 lines.append("\t};")
-lines.append("\tobjectVersion = 77;")
+lines.append("\tobjectVersion = 56;")
 lines.append("\tobjects = {")
 lines.append("")
 

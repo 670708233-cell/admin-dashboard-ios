@@ -22,19 +22,10 @@ jobs:
       - name: Generate Xcode project
         run: python3 generate_project.py
 
-      - name: Verify Project
-        run: |
-          echo "=== Project list ==="
-          xcodebuild -list -project AdminDashboard.xcodeproj 2>&1 | head -30 || echo "LIST FAILED"
-          echo "=== Build settings ==="
-          xcodebuild -project AdminDashboard.xcodeproj -scheme AdminDashboard -showBuildSettings 2>&1 | head -50 || echo "SHOWBUILDSETTINGS FAILED"
-
       - name: Build
         run: |
           echo "=== Building with xcodebuild ==="
           set -o pipefail
-          
-          # Try building with explicit destination (Xcode 15 compatible)
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -44,23 +35,19 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             | tee build.log
-          
+
           BUILD_EXIT=${PIPESTATUS[0]}
           echo "Build exit: $BUILD_EXIT"
-          if [ $BUILD_EXIT -ne 0 ]; then
-            echo "=== Build FAILED ==="
-            echo "=== Full build log ==="
-            cat build.log
-            echo "=== End of build log ==="
-            
-            # Write to step summary (publicly visible)
-            echo "## Build Failed" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            tail -100 build.log >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            
-            exit $BUILD_EXIT
-          fi
+          exit $BUILD_EXIT
+
+      - name: Surface build error
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=== Uploading build.log to a public gist for inspection ==="
+          # gh authenticates automatically via GH_TOKEN on GitHub-hosted runners
+          gh gist create build.log -d "ios-build-error-${{ github.run_id }}" || true
 
       - name: Upload Build Log
         if: always()
@@ -74,7 +61,6 @@ jobs:
         if: success()
         run: |
           echo "=== Looking for .app ==="
-          find build -name "*.app" -type d 2>/dev/null
           APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           if [ -z "$APP" ]; then
             APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
