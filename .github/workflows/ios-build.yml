@@ -12,24 +12,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Select Xcode
+        run: |
+          echo "=== Available Xcode ==="
+          ls /Applications/ | grep -i xcode || echo "NO XCODE FOUND"
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer 2>/dev/null || xcode-select -p
+          xcodebuild -version
+
       - name: Generate Xcode project
         run: python3 generate_project.py
 
       - name: Build
         run: |
-          echo "=== Xcode version ==="
-          xcodebuild -version
-          
           echo "=== Building with xcodebuild ==="
           set -o pipefail
-          
-          echo "=== Environment ==="
-          which xcodebuild
-          ls -la /Applications/ | grep -i xcode || echo "NO XCODE IN APPLICATIONS"
-          xcodebuild -version 2>&1 || echo "XCODEBUILD VERSION FAILED"
-          echo "=== Available Xcode versions ==="
-          ls /Applications/ | grep -i xcode || true
-          xcode-select -p || true
           
           # Try building with explicit destination (Xcode 15 compatible)
           xcodebuild build \
