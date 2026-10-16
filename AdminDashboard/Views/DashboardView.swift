@@ -58,7 +58,7 @@ struct DashboardView: View {
             Spacer()
             HStack(spacing: 6) {
                 Circle().fill(Tech.green).frame(width: 7, height: 7).shadow(color: Tech.green, radius: 4)
-                Text("在线").font(.system(size: 11)).foregroundColor(Tech.green)
+                Text("在线V2").font(.system(size: 11)).foregroundColor(Tech.green)
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 5)

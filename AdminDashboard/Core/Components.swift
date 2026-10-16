@@ -59,7 +59,7 @@ struct GridLines: View {
                 path.addLine(to: CGPoint(x: size.width, y: y))
                 y += step
             }
-            ctx.stroke(path, with: .color(.white.opacity(0.055)), lineWidth: 1)
+            ctx.stroke(path, with: .color(.red.opacity(0.85)), lineWidth: 2)
         }
     }
 }
