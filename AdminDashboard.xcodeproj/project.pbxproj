@@ -36,7 +36,7 @@
 		FC198B0C87CC3C60B324146E /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8C9986E985D0E2DF8BBD8A0 /* Models.swift */; };
 		E0FB6B7C44F0232D5FE4C816 /* RefreshIntervalStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0393AA999D4A3B7825E72F0 /* RefreshIntervalStore.swift */; };
 		DB3C87A9929D768899EF7FB2 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BF1965FB15F7AFD6CEBA45 /* Theme.swift */; };
-		25803DEC0E9C5D4597305329 /* Info.plist in Sources */ = {isa = PBXBuildFile; fileRef = 125DE18351D488FB2B9EB6A8 /* Info.plist */; };
+		25803DEC0E9C5D4597305329 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 125DE18351D488FB2B9EB6A8 /* Info.plist */; };
 		672AC00C3033195FD24FBF64 /* AiKeysView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95A1D2DFBDC122F693967EE9 /* AiKeysView.swift */; };
 		641D5D869DB57F815FB8E031 /* AlipayUsersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A38E08960C5BD0137EC97E80 /* AlipayUsersView.swift */; };
 		7AE90AB07878D36AAD736AB3 /* CookieView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 493CA19852C945FD0CFA4397 /* CookieView.swift */; };

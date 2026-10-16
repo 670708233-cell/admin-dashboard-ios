@@ -103,12 +103,15 @@ for f, fid in sorted(file_refs.items()):
 lines.append("/* End PBXFileReference section */")
 lines.append("")
 
-# PBXBuildFile section
+# PBXBuildFile section - separate Swift files and plist files
 lines.append("/* Begin PBXBuildFile section */")
 for f, bid in sorted(build_files.items()):
     fid = file_refs[f]
     basename = os.path.basename(f)
-    lines.append(f"\t\t{bid} /* {basename} in Sources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
+    if f.endswith(".swift"):
+        lines.append(f"\t\t{bid} /* {basename} in Sources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
+    elif f.endswith(".plist"):
+        lines.append(f"\t\t{bid} /* {basename} in Resources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
 lines.append("/* End PBXBuildFile section */")
 lines.append("")
 
@@ -240,7 +243,7 @@ lines.append("\t\t};")
 lines.append("/* End PBXResourcesBuildPhase section */")
 lines.append("")
 
-# PBXSourcesBuildPhase section
+# PBXSourcesBuildPhase section - only Swift files
 lines.append("/* Begin PBXSourcesBuildPhase section */")
 lines.append(f"\t\t{src_phase_id} /* Sources */ = {{")
 lines.append("\t\t\tisa = PBXSourcesBuildPhase;")
