@@ -45,9 +45,13 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Uploading build.log to a public gist for inspection ==="
-          # gh authenticates automatically via GH_TOKEN on GitHub-hosted runners
-          gh gist create build.log -d "ios-build-error-${{ github.run_id }}" || true
+          echo "=== Committing build.log to ci-logs branch for inspection ==="
+          git config user.email "ci@github.com"
+          git config user.name "CI Bot"
+          cp build.log ci-build-error.log
+          git add ci-build-error.log
+          git commit -m "ci: build error log run ${{ github.run_id }}" || true
+          git push origin HEAD:ci-logs || true
 
       - name: Upload Build Log
         if: always()
