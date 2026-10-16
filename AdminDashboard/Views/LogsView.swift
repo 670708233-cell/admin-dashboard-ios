@@ -40,16 +40,20 @@ struct LogsView: View {
                             }
                         } label: {
                             GlassCard(accent: Tech.cyan, borderAlpha: 0.2, glowAlpha: 0.1) {
-                                HStack(alignment: .top) {
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text("\(l.admin ?? "-") · \(l.action ?? "-")")
-                                            .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
-                                        Text("目标: \(l.target ?? "-") | IP: \(l.ip ?? "-") | \(l.time ?? l.createdAt ?? "-")")
-                                            .font(.system(size: 12)).foregroundColor(.white.opacity(0.7))
+                            HStack(alignment: .top) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(l.username ?? "-") · \(l.actionType ?? "-")")
+                                        .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                                    if let desc = l.description, !desc.isEmpty {
+                                        Text(desc).font(.system(size: 12)).foregroundColor(.white.opacity(0.7))
+                                            .lineLimit(2)
                                     }
-                                    Spacer()
-                                    Text("详情 ›").font(.system(size: 13)).foregroundColor(Tech.cyan)
+                                    Text("IP: \(l.ipAddress ?? "-") | \(l.createdAt ?? "-")")
+                                        .font(.system(size: 12)).foregroundColor(.white.opacity(0.5))
                                 }
+                                Spacer()
+                                Text("详情 ›").font(.system(size: 13)).foregroundColor(Tech.cyan)
+                            }
                             }
                         }
                         .buttonStyle(.plain)
@@ -98,12 +102,12 @@ struct LogDetailSheet: View {
         NavigationStack {
             List {
                 detailRow("ID", "\(log.id ?? 0)")
-                detailRow("管理员", log.admin ?? "-")
-                detailRow("操作", log.action ?? "-")
-                detailRow("目标", log.target ?? "-")
-                detailRow("IP", log.ip ?? "-")
-                detailRow("时间", log.time ?? log.createdAt ?? "-")
-                detailRow("详情", log.detail ?? "-")
+                detailRow("操作人", log.username ?? "-")
+                detailRow("操作类型", log.actionType ?? "-")
+                detailRow("描述", log.description ?? "-")
+                detailRow("IP", log.ipAddress ?? "-")
+                detailRow("UA", log.userAgent ?? "-")
+                detailRow("时间", log.createdAt ?? "-")
             }
             .listStyle(.plain)
             .background(Color(red: 0.06, green: 0.07, blue: 0.12).ignoresSafeArea())

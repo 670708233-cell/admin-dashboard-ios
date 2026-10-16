@@ -222,7 +222,7 @@ final class APIClient {
 
     // MARK: - AI Key 管理
 
-    func aiKeys(page: Int = 1, pageSize: Int = 100, keyword: String? = nil) async throws -> [AiKey] {
+    func aiKeys(page: Int = 1, pageSize: Int = 100, keyword: String? = nil) async throws -> PageData<AiKey> {
         try await unwrap("admin/ai_keys/list", query: [
             .init(name: "page", value: "\(page)"),
             .init(name: "page_size", value: "\(pageSize)"),

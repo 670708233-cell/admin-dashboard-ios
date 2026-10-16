@@ -12,15 +12,13 @@ struct AiKeysView: View {
     @State private var toast: String?
     @State private var toastTask: Task<Void, Never>?
 
-    private var now: Int64 { Int64(Date().timeIntervalSince1970 * 1000) }
-
     var body: some View {
         VStack(spacing: 10) {
             HStack(spacing: 12) {
-                MiniStat(title: "总数", value: fmt(stats?.total))
-                MiniStat(title: "启用", value: fmt(stats?.active), color: Tech.green)
-                MiniStat(title: "禁用", value: fmt(stats?.disabled), color: Tech.red)
-                MiniStat(title: "冷却中", value: fmt(stats?.cooling), color: Tech.yellow)
+                MiniStat(title: "总数", value: fmt(stats?.totalKeys))
+                MiniStat(title: "启用", value: fmt(stats?.activeKeys), color: Tech.green)
+                MiniStat(title: "可用", value: fmt(stats?.availableKeys), color: Tech.cyan)
+                MiniStat(title: "熔断中", value: fmt(stats?.coolingKeys), color: Tech.yellow)
             }
 
             // 熔断配置
@@ -46,9 +44,9 @@ struct AiKeysView: View {
                     ForEach(keys) { k in
                         AiKeyCard(
                             key: k,
-                            cooling: (k.cooldownUntil ?? 0) > now,
+                            cooling: k.inCooldown == true,
                             onTest: { run({ try await APIClient.shared.aiKeyTest(AiKeyTestReq(id: k.id ?? 0)) }, msg: "测试完成") },
-                            onToggle: { run({ try await APIClient.shared.aiKeyToggle(AiKeyToggleReq(id: k.id ?? 0, status: (k.status == 1) ? 0 : 1)) }, msg: "状态已切换") },
+                            onToggle: { run({ try await APIClient.shared.aiKeyToggle(AiKeyToggleReq(id: k.id ?? 0, isActive: (k.isActive == 1) ? 0 : 1)) }, msg: "状态已切换") },
                             onReset: { run({ try await APIClient.shared.aiKeyResetCooldown(AiKeyCooldownReq(id: k.id ?? 0)) }, msg: "已重置熔断") },
                             onEdit: { editing = k },
                             onDelete: { run({ try await APIClient.shared.aiKeyDelete(AiKeyDeleteReq(id: k.id ?? 0)) }, msg: "已删除") }
@@ -76,13 +74,13 @@ struct AiKeysView: View {
         }
         .onAppear { load() }
         .sheet(isPresented: $adding) {
-            AiKeyEditSheet(key: nil) { name, provider, apiKey, remark in
-                run({ try await APIClient.shared.aiKeyAdd(AiKeyAddReq(name: name, provider: provider, apiKey: apiKey ?? "", remark: remark)) }, msg: "已添加")
+            AiKeyEditSheet(key: nil) { name, provider, apiKey, baseUrl, model, note in
+                run({ try await APIClient.shared.aiKeyAdd(AiKeyAddReq(name: name, provider: provider, apiKey: apiKey, baseUrl: baseUrl, model: model, priority: nil, note: note)) }, msg: "已添加")
             }
         }
         .sheet(item: $editing) { k in
-            AiKeyEditSheet(key: k) { name, provider, apiKey, remark in
-                run({ try await APIClient.shared.aiKeyUpdate(AiKeyUpdateReq(id: k.id ?? 0, name: name, provider: provider, apiKey: apiKey, remark: remark, status: k.status)) }, msg: "已保存")
+            AiKeyEditSheet(key: k) { name, provider, apiKey, baseUrl, model, note in
+                run({ try await APIClient.shared.aiKeyUpdate(AiKeyUpdateReq(id: k.id ?? 0, name: name, apiKey: apiKey, baseUrl: baseUrl, model: model, priority: k.priority, note: note)) }, msg: "已保存")
             }
         }
         .sheet(isPresented: $editingConfig) {
@@ -133,7 +131,7 @@ struct AiKeysView: View {
         loading = true; error = nil
         Task {
             do {
-                keys = try await APIClient.shared.aiKeys()
+                keys = try await APIClient.shared.aiKeys().rows
                 stats = try? await APIClient.shared.aiKeyStats()
                 config = try? await APIClient.shared.aiKeyConfig()
             } catch {
@@ -162,9 +160,11 @@ struct AiKeyCard: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(key.name ?? "-")
                             .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
-                        Text("厂商: \(key.provider ?? "-") | 状态: \((key.status == 1) ? "启用" : "禁用") | \(cooling ? "冷却中" : "正常")")
+                        Text("厂商: \(key.provider ?? "-") | 模型: \(key.model ?? "-")")
                             .font(.system(size: 12)).foregroundColor(.white.opacity(0.7))
-                        Text("调用: \(key.usedCount ?? 0) | 失败: \(key.failCount ?? 0)")
+                        Text("状态: \((key.isActive == 1) ? "启用" : "禁用") | \(cooling ? "冷却中(\(key.cooldownRemain ?? 0)s)" : "正常")")
+                            .font(.system(size: 12)).foregroundColor(cooling ? Tech.yellow : .white.opacity(0.7))
+                        Text("今日: \(key.todayCalls ?? 0) | 失败: \(key.failedCount ?? 0) | 累计: \(key.totalCalls ?? 0)")
                             .font(.system(size: 12)).foregroundColor(.white.opacity(0.7))
                     }
                     Spacer()
@@ -172,7 +172,7 @@ struct AiKeyCard: View {
                         .buttonStyle(TechButtonStyle(compact: true))
                 }
                 HStack(spacing: 8) {
-                    Button((key.status == 1) ? "禁用" : "启用", action: onToggle)
+                    Button((key.isActive == 1) ? "禁用" : "启用", action: onToggle)
                         .buttonStyle(TechButtonStyle(compact: true))
                     Button("重置熔断", action: onReset)
                         .buttonStyle(TechButtonStyle(compact: true))
@@ -191,21 +191,32 @@ struct AiKeyCard: View {
 
 struct AiKeyEditSheet: View {
     let key: AiKey?
-    var onConfirm: (String, String?, String?, String?) -> Void
+    var onConfirm: (String, String, String, String, String, String?) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
-    @State private var provider = ""
+    @State private var provider = "agnes"
     @State private var apiKey = ""
-    @State private var remark = ""
+    @State private var baseUrl = ""
+    @State private var model = ""
+    @State private var note = ""
 
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 14) {
                 LabeledField(label: "名称", text: $name)
-                LabeledField(label: "厂商", text: $provider)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("厂商").font(.system(size: 13)).foregroundColor(.white.opacity(0.6))
+                    Picker("厂商", selection: $provider) {
+                        Text("agnes").tag("agnes")
+                        Text("stepfun").tag("stepfun")
+                    }
+                    .pickerStyle(.segmented)
+                }
                 LabeledField(label: "API Key", text: $apiKey)
-                LabeledField(label: "备注(可选)", text: $remark)
+                LabeledField(label: "Base URL", text: $baseUrl)
+                LabeledField(label: "模型", text: $model)
+                LabeledField(label: "备注(可选)", text: $note)
                 Spacer()
             }
             .padding(20)
@@ -218,19 +229,21 @@ struct AiKeyEditSheet: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("保存") {
-                        onConfirm(name, provider.isEmpty ? nil : provider, apiKey, remark.isEmpty ? nil : remark)
+                        onConfirm(name, provider, apiKey, baseUrl, model, note.isEmpty ? nil : note)
                         dismiss()
                     }
                     .foregroundColor(Tech.cyan)
-                    .disabled(name.isEmpty || apiKey.isEmpty)
+                    .disabled(name.isEmpty || apiKey.isEmpty || baseUrl.isEmpty || model.isEmpty)
                 }
             }
             .onAppear {
                 if let key {
                     name = key.name ?? ""
-                    provider = key.provider ?? ""
+                    provider = key.provider ?? "agnes"
                     apiKey = key.apiKey ?? ""
-                    remark = key.remark ?? ""
+                    baseUrl = key.baseUrl ?? ""
+                    model = key.model ?? ""
+                    note = key.note ?? ""
                 }
             }
         }

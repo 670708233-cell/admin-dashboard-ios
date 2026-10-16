@@ -15,23 +15,25 @@ struct PlainResp: Decodable {
     let msg: String?
 }
 
-/// 分页结构：兼容 list/items/users/cookies 与 total/count
+/// 分页结构：兼容 list/items/users/cookies/logs/keys 与 total/count
 struct PageData<T: Decodable>: Decodable {
     let list: [T]?
     let items: [T]?
     let users: [T]?
     let cookies: [T]?
+    let logs: [T]?
+    let keys: [T]?
     let total: Int?
     let count: Int?
     let page: Int?
     let pageSize: Int?
 
-    var rows: [T] { list ?? items ?? users ?? cookies ?? [] }
+    var rows: [T] { list ?? items ?? users ?? cookies ?? logs ?? keys ?? [] }
     var totalCount: Int { total ?? count ?? 0 }
     var totalPages: Int { max(1, (totalCount + 19) / 20) }
 
     enum CodingKeys: String, CodingKey {
-        case list, items, users, cookies, total, count, page
+        case list, items, users, cookies, logs, keys, total, count, page
         case pageSize = "page_size"
     }
 }
@@ -513,19 +515,21 @@ struct SettingDeleteReq: Encodable {
     let id: Int
 }
 
-// MARK: - 操作日志
+// MARK: - 操作日志（对齐后端 admin.Log 真实字段）
 
 struct OpLog: Decodable, Identifiable {
     let id: Int?
-    let admin: String?
-    let action: String?
-    let target: String?
-    let detail: String?
-    let ip: String?
-    let time: String?
+    let username: String?
+    let actionType: String?
+    let description: String?
+    let ipAddress: String?
+    let userAgent: String?
     let createdAt: String?
     enum CodingKeys: String, CodingKey {
-        case id, admin, action, target, detail, ip, time
+        case id, username, description
+        case actionType = "action_type"
+        case ipAddress = "ip_address"
+        case userAgent = "user_agent"
         case createdAt = "created_at"
     }
 }
@@ -537,27 +541,53 @@ struct AiKey: Decodable, Identifiable {
     let name: String?
     let provider: String?
     let apiKey: String?
-    let status: Int?
-    let cooldownUntil: Int64?
-    let usedCount: Int?
-    let failCount: Int?
-    let lastUsed: String?
-    let remark: String?
+    let baseUrl: String?
+    let model: String?
+    let priority: Int?
+    let isActive: Int?
+    let isAvailable: Int?
+    let inCooldown: Bool?
+    let cooldownRemain: Int?
+    let todayCalls: Int?
+    let totalCalls: Int?
+    let failedCount: Int?
+    let lastError: String?
+    let lastCheckAt: String?
+    let note: String?
+    let createdAt: String?
+
     enum CodingKeys: String, CodingKey {
-        case id, name, provider, status, remark
+        case id, name, provider, model, priority, note
         case apiKey = "api_key"
-        case cooldownUntil = "cooldown_until"
-        case usedCount = "used_count"
-        case failCount = "fail_count"
-        case lastUsed = "last_used"
+        case baseUrl = "base_url"
+        case isActive = "is_active"
+        case isAvailable = "is_available"
+        case inCooldown = "in_cooldown"
+        case cooldownRemain = "cooldown_remain"
+        case todayCalls = "today_calls"
+        case totalCalls = "total_calls"
+        case failedCount = "failed_count"
+        case lastError = "last_error"
+        case lastCheckAt = "last_check_at"
+        case createdAt = "created_at"
     }
 }
 
 struct AiKeyStats: Decodable {
-    let total: Int?
-    let active: Int?
-    let disabled: Int?
-    let cooling: Int?
+    let totalKeys: Int?
+    let activeKeys: Int?
+    let availableKeys: Int?
+    let coolingKeys: Int?
+    let todayCalls: Int?
+    let failedTotal: Int?
+    enum CodingKeys: String, CodingKey {
+        case totalKeys = "total_keys"
+        case activeKeys = "active_keys"
+        case availableKeys = "available_keys"
+        case coolingKeys = "cooling_keys"
+        case todayCalls = "today_calls"
+        case failedTotal = "failed_total"
+    }
 }
 
 struct AiKeyConfig: Decodable {
@@ -569,31 +599,41 @@ struct AiKeyConfig: Decodable {
 
 struct AiKeyAddReq: Encodable {
     let name: String
-    let provider: String?
+    let provider: String
     let apiKey: String
-    let remark: String?
+    let baseUrl: String
+    let model: String
+    let priority: Int?
+    let note: String?
     enum CodingKeys: String, CodingKey {
-        case name, provider, remark
+        case name, provider, model, priority, note
         case apiKey = "api_key"
+        case baseUrl = "base_url"
     }
 }
 
 struct AiKeyUpdateReq: Encodable {
     let id: Int
     let name: String?
-    let provider: String?
     let apiKey: String?
-    let remark: String?
-    let status: Int?
+    let baseUrl: String?
+    let model: String?
+    let priority: Int?
+    let note: String?
     enum CodingKeys: String, CodingKey {
-        case id, name, provider, remark, status
+        case id, name, model, priority, note
         case apiKey = "api_key"
+        case baseUrl = "base_url"
     }
 }
 
 struct AiKeyToggleReq: Encodable {
     let id: Int
-    let status: Int
+    let isActive: Int
+    enum CodingKeys: String, CodingKey {
+        case id
+        case isActive = "is_active"
+    }
 }
 
 struct AiKeyCooldownReq: Encodable {
