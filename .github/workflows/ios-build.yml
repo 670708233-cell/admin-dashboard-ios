@@ -12,41 +12,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Xcode Installation
+      - name: Verify Xcode
         run: |
-          echo "=== Xcode version ==="
           xcodebuild -version
-          
-          echo "=== Available SDKs ==="
           xcodebuild -showsdks | grep iphoneos
-          
-          echo "=== Available destinations ==="
-          xcodebuild -list -project AdminDashboard.xcodeproj 2>/dev/null || python3 generate_project.py && xcodebuild -list -project AdminDashboard.xcodeproj
 
       - name: Generate Xcode project
         run: python3 generate_project.py
 
       - name: Verify Project
-        run: |
-          echo "=== Project list ==="
-          xcodebuild -list -project AdminDashboard.xcodeproj
-          
-          echo "=== Build settings check ==="
-          xcodebuild -project AdminDashboard.xcodeproj \
-            -scheme AdminDashboard \
-            -showBuildSettings \
-            2>&1 | grep -E "(PRODUCT_NAME|WRAPPER_EXTENSION|BUILD_DIR|OBJROOT|SYMROOT)" | head -20
-
-      - name: Clean Build
-        run: rm -rf build && mkdir build
+        run: xcodebuild -list -project AdminDashboard.xcodeproj
 
       - name: Build
-        id: build_step
-        continue-on-error: true
+        id: build
         run: |
-          echo "=== Building with xcodebuild ==="
           set -o pipefail
-          
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -55,82 +35,47 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            CLANG_ENABLE_MODULES=YES \
             2>&1 | tee build.log
           
-          BUILD_EXIT=${PIPESTATUS[0]}
-          echo "Build exit: $BUILD_EXIT"
-          echo "exit_code=$BUILD_EXIT" >> "$GITHUB_OUTPUT"
-          
-          echo "=== Build log summary ==="
-          grep -E "(error:|BUILD SUCCEEDED|BUILD FAILED)" build.log | head -30
-          
-          exit $BUILD_EXIT
+          echo "Build exit code: ${PIPESTATUS[0]}"
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Find Built Products
-        if: always()
+      - name: Check Build Result
         run: |
-          echo "=== All build artifacts ==="
-          find build -type f \( -name "*.app" -o -name "*.ipa" -o -name "*.xcarchive" -o -name "*.dSYM" \) 2>/dev/null | head -20
+          if [ "${{ steps.build.outputs.exit_code }}" != "0" ]; then
+            echo "BUILD FAILED with exit code ${{ steps.build.outputs.exit_code }}"
+            echo "=== Last 100 lines of build log ==="
+            tail -100 build.log
+            exit "${{ steps.build.outputs.exit_code }}"
+          fi
           
-          echo ""
-          echo "=== Build/Build/Products structure ==="
-          find build/Build/Products -type f -name "*.app" 2>/dev/null | while read app; do
-            echo "Found: $app"
-            echo "Size: $(du -sh "$app" | cut -f1)"
-            ls -la "$app" | head -10
+          echo "=== BUILD SUCCEEDED ==="
+          echo "=== Looking for .app ==="
+          find build -name "*.app" -type d 2>/dev/null | while read app; do
+            echo "Found: $app ($(du -sh "$app" | cut -f1))"
           done
-          
-          echo ""
-          echo "=== Detailed build output ==="
-          tail -50 build.log
 
       - name: Package IPA
         if: success()
         run: |
-          echo "=== Packaging IPA ==="
-          
-          # Find the actual .app
-          APP=$(find build/Build/Products -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
+          APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           
           if [ -z "$APP" ]; then
-            echo "Trying alternative search..."
-            APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
-          fi
-          
-          if [ -z "$APP" ]; then
-            echo "ERROR: No .app found!"
-            echo "Build directory contents:"
-            ls -R build/Build/Products/ 2>/dev/null | head -50
+            echo "ERROR: AdminDashboard.app not found!"
             exit 1
           fi
           
-          echo "=== Found app: $APP ==="
-          echo "Size:"
+          echo "Packaging: $APP"
           du -sh "$APP"
           
-          # Check binary
-          BINARY="$APP/AdminDashboard"
-          if [ -f "$BINARY" ]; then
-            echo "Binary info:"
-            file "$BINARY"
-            ls -lh "$BINARY"
-          else
-            echo "WARNING: No binary found in .app"
-          fi
-          
-          # Package IPA
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
-          
-          echo "=== Packaging to IPA ==="
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           
           echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
-          echo "=== IPA contents ==="
-          unzip -l AdminDashboard-unsigned.ipa
+          unzip -l AdminDashboard-unsigned.ipa | head -20
 
       - name: Upload IPA
         if: success()
