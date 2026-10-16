@@ -28,6 +28,14 @@ for sf in swift_files:
 for pf in plist_files:
     print(f"  {pf}")
 
+# Collect asset catalogs (.xcassets) at the top level of SRC_DIR
+asset_catalogs = []
+for entry in sorted(os.listdir(SRC_DIR)):
+    if entry.endswith(".xcassets"):
+        rel = os.path.relpath(os.path.join(SRC_DIR, entry), BASE_DIR).replace("\\", "/")
+        asset_catalogs.append(rel)
+print("Asset catalogs:", asset_catalogs)
+
 # Generate unique 24-char hex IDs
 def gen_id(seed):
     h = hashlib.md5(seed.encode()).hexdigest()
@@ -85,6 +93,17 @@ for f in all_files:
     parent_key = "/".join(parent_parts)
     groups[parent_key][1].append(fid)
 
+# Asset catalogs: file ref + Resources build file, attached to their parent group
+for ac in asset_catalogs:
+    fid = gen_id("file:" + ac)
+    file_refs[ac] = fid
+    bid = gen_id("build:" + ac)
+    build_files[ac] = bid
+    parts = ac.split("/")
+    parent_parts = parts[:-1]
+    ensure_group(parent_parts)
+    groups["/".join(parent_parts)][1].append(fid)
+
 # Generate project.pbxproj content
 lines = []
 lines.append("// !$*UTF8*$!")
@@ -106,15 +125,18 @@ for f, fid in sorted(file_refs.items()):
         lines.append(f"\t\t{fid} /* {basename} */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {basename}; sourceTree = \"<group>\"; }};")
     elif f.endswith(".plist"):
         lines.append(f"\t\t{fid} /* {basename} */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = {basename}; sourceTree = \"<group>\"; }};")
+    elif f.endswith(".xcassets"):
+        lines.append(f"\t\t{fid} /* {basename} */ = {{isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = {basename}; sourceTree = \"<group>\"; }};")
 lines.append("/* End PBXFileReference section */")
 lines.append("")
 
-# PBXBuildFile section - Swift sources only (Info.plist has no build file)
+# PBXBuildFile section - Swift sources + asset catalogs (Info.plist has no build file)
 lines.append("/* Begin PBXBuildFile section */")
 for f, bid in sorted(build_files.items()):
     fid = file_refs[f]
     basename = os.path.basename(f)
-    lines.append(f"\t\t{bid} /* {basename} in Sources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
+    phase = "in Resources" if f.endswith(".xcassets") else "in Sources"
+    lines.append(f"\t\t{bid} /* {basename} {phase} */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
 lines.append("/* End PBXBuildFile section */")
 lines.append("")
 
@@ -229,13 +251,16 @@ lines.append("\t\t};")
 lines.append("/* End PBXProject section */")
 lines.append("")
 
-# PBXResourcesBuildPhase section - empty; Info.plist is handled by
-# INFOPLIST_FILE (ProcessInfoPlistFile), NOT by a copy command here.
+# PBXResourcesBuildPhase section - asset catalogs compiled here; Info.plist is
+# handled by INFOPLIST_FILE (ProcessInfoPlistFile), NOT by a copy command here.
 lines.append("/* Begin PBXResourcesBuildPhase section */")
 lines.append(f"\t\t{res_phase_id} /* Resources */ = {{")
 lines.append("\t\t\tisa = PBXResourcesBuildPhase;")
 lines.append("\t\t\tbuildActionMask = 2147483647;")
 lines.append("\t\t\tfiles = (")
+for ac in sorted(asset_catalogs):
+    bid = build_files[ac]
+    lines.append(f"\t\t\t\t{bid} /* {os.path.basename(ac)} in Resources */,")
 lines.append("\t\t\t);")
 lines.append("\t\t\trunOnlyForDeploymentPostprocessing = 0;")
 lines.append("\t\t};")
@@ -292,6 +317,7 @@ def build_config(config_id, name, is_target, is_debug):
             lines.append("\t\t\t\tSWIFT_COMPILATION_MODE = wholemodule;")
             lines.append("\t\t\t\tSWIFT_OPTIMIZATION_LEVEL = \"-O\";")
     else:
+        lines.append("\t\t\t\tASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;")
         lines.append("\t\t\t\tCODE_SIGN_STYLE = Manual;")
         lines.append("\t\t\t\tCURRENT_PROJECT_VERSION = 1;")
         lines.append("\t\t\t\tENABLE_USER_SCRIPT_SANDBOXING = NO;")
