@@ -52,62 +52,75 @@ jobs:
           find build -name "*.app" -type d 2>/dev/null | while read app; do
             echo "Found: $app"
             du -sh "$app"
+            ls -la "$app" | head -10
           done
+          
+          echo ""
+          echo "=== Build Products ==="
+          find build/Build/Products -type f 2>/dev/null | head -20
+
+      - name: Package IPA
+        id: package
+        continue-on-error: true
+        run: |
+          echo "=== Packaging IPA ==="
+          APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
+          
+          echo "App path: '$APP'"
+          
+          if [ -z "$APP" ]; then
+            echo "ERROR: No AdminDashboard.app found!"
+            echo "Available apps:"
+            find build -name "*.app" -type d 2>/dev/null
+            exit 1
+          fi
+          
+          echo "Found app: $APP"
+          du -sh "$APP"
+          
+          # Check binary
+          if [ ! -f "$APP/AdminDashboard" ]; then
+            echo "ERROR: Binary not found!"
+            ls -la "$APP"
+            exit 1
+          fi
+          
+          # Package IPA
+          rm -rf Payload && mkdir Payload
+          cp -R "$APP" Payload/
+          
+          echo "=== Creating IPA ==="
+          zip -qr AdminDashboard-unsigned.ipa Payload/
+          rm -rf Payload
+          
+          if [ -f AdminDashboard-unsigned.ipa ]; then
+            echo "=== IPA created ==="
+            ls -lh AdminDashboard-unsigned.ipa
+            unzip -l AdminDashboard-unsigned.ipa | head -20
+          else
+            echo "ERROR: IPA file not created!"
+            ls -la *.ipa 2>/dev/null || echo "No .ipa files"
+            exit 1
+          fi
 
       - name: Create Gist on Failure
-        if: steps.build.outputs.exit_code != '0'
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           echo "=== Creating gist ==="
           echo "Build exit code: ${{ steps.build.outputs.exit_code }}"
+          echo "Package outcome: ${{ steps.package.outcome }}"
           
-          # Create gist and capture URL
-          GIST_OUTPUT=$(gh gist create build.log --public \
+          # Create gist with build log
+          gh gist create build.log \
+            --public \
             --filename "build-error.log" \
             --description "iOS Build Error - Run ${{ github.run_id }}" \
-            2>&1)
-          
-          echo "Gist output: $GIST_OUTPUT"
-          echo "$GIST_OUTPUT" > /tmp/gist-result.txt
-          
-          # Save Gist URL for later
-          GIST_URL=$(echo "$GIST_OUTPUT" | grep -oE 'https://gist.github.com/[a-f0-9]+' | head -1)
-          if [ -n "$GIST_URL" ]; then
-            echo "Gist URL: $GIST_URL"
-            echo "$GIST_URL" > /tmp/gist-url.txt
-          else
-            echo "Failed to create gist"
-            echo "Raw output: $GIST_OUTPUT" > /tmp/gist-error.txt
-          fi
-
-      - name: Upload Gist Info
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gist-info
-          path: /tmp/gist-*.txt
-
-      - name: Package IPA
-        if: success()
-        run: |
-          echo "=== Packaging IPA ==="
-          APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
-          
-          if [ -z "$APP" ]; then
-            echo "ERROR: No AdminDashboard.app found!"
-            exit 1
-          fi
-          
-          rm -rf Payload && mkdir Payload
-          cp -R "$APP" Payload/
-          zip -qr AdminDashboard-unsigned.ipa Payload/
-          rm -rf Payload
-          
-          ls -lh AdminDashboard-unsigned.ipa
+            || echo "Failed to create gist"
 
       - name: Upload IPA
-        if: success()
+        if: steps.package.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: AdminDashboard-unsigned
