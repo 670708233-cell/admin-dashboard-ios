@@ -122,20 +122,31 @@ print(f"OK:{len(data)//1024//1024}MB")
 
     if (Test-Path $ipaFile) { Remove-Item $ipaFile -Force }
 
-    # 先找 run ID
-    $findOut = & $pyExe.Source $pyFile "670708233-cell" "admin-dashboard-ios" $ipaFile 2>&1
-    Write-Host "  $findOut" -ForegroundColor Gray
+    # 用 Python 直接获取最新成功的 run ID（无需 gh CLI）
+    $findScript = @'
+import urllib.request, json, sys
+os.environ["HTTP_PROXY"] = "http://127.0.0.1:10808"
+os.environ["HTTPS_PROXY"] = "http://127.0.0.1:10808"
+owner, repo = sys.argv[1], sys.argv[2]
+url = f"https://api.github.com/repos/{owner}/{repo}/actions/runs?per_page=20"
+r = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json"})
+with urllib.request.urlopen(r, timeout=20) as resp:
+    runs = json.loads(resp.read()).get("workflow_runs", [])
+    for run in runs:
+        if run.get("conclusion") == "success" and "ios" in str(run.get("name","")).lower():
+            print(run["id"])
+            break
+    else:
+        print("NOT_FOUND")
+'@
+    $findFile = Join-Path $TempDir "find_run_id.py"
+    $findScript | Out-File -FilePath $findFile -Encoding utf8
+    
+    $runId = & $pyExe.Source $findFile "670708233-cell" "admin-dashboard-ios" 2>&1
+    Write-Host "  Run ID: $runId" -ForegroundColor Gray
 
-    # 用 gh CLI 或手动指定 run
-    $runId = ""
-    $ghCmd = Get-Command gh -ErrorAction SilentlyContinue
-    if ($ghCmd) {
-        $runId = & gh run list --repo "670708233-cell/admin-dashboard-ios" --workflow "iOS Build" --status success --limit 1 --json databaseId --jq '.[0].databaseId' 2>$null
-        $runId = $runId -replace '"',''
-    }
-
-    if (-not $runId -or $runId -eq "null") {
-        Out-Err "无法获取 GitHub Actions run ID。请检查仓库是否已推送，或在 https://github.com/670708233-cell/admin-dashboard-ios/actions 手动触发构建后运行此脚本。"
+    if (-not $runId -or $runId -eq "NOT_FOUND") {
+        Out-Err "未找到成功的构建。请先触发构建：https://github.com/670708233-cell/admin-dashboard-ios/actions"
     }
 
     Write-Host "  Run ID: $runId" -ForegroundColor Yellow
