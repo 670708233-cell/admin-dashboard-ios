@@ -31,7 +31,6 @@ jobs:
           echo "=== Building ==="
           set -o pipefail
           
-          # Use sdk directly instead of destination for build command
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -47,10 +46,6 @@ jobs:
           EXIT_CODE=${PIPESTATUS[0]}
           echo "Build exit code: $EXIT_CODE"
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-          
-          echo ""
-          echo "=== Build Summary ==="
-          grep -E "(BUILD SUCCEEDED|BUILD FAILED|error:|CompileSwift)" build.log | head -30
 
       - name: Find App
         if: always()
@@ -71,13 +66,40 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Creating gist ==="
-          cat build.log > /tmp/build.log
-          gh gist create /tmp/build.log \
-            --public \
-            --filename "build-error.log" \
+          echo "=== Creating gist with error ==="
+          
+          # Create a summary file
+          cat > /tmp/build-error.md << EOF
+          # iOS Build Error
+          
+          **Run:** ${{ github.run_id }}
+          **Commit:** ${{ github.sha }}
+          **Exit Code:** ${{ steps.build.outputs.exit_code }}
+          
+          ## Build Log (last 200 lines)
+          
+          \`\`\`
+          $(tail -200 build.log 2>/dev/null || echo "No build.log")
+          \`\`\`
+          
+          ## App Search Results
+          
+          \`\`\`
+          $(find build -name "*.app" -type d 2>/dev/null | head -10 || echo "No .app found")
+          \`\`\`
+          EOF
+          
+          # Upload to gist
+          gh gist create /tmp/build-error.md --public \
+            --filename "build-error.md" \
             --description "iOS Build Error - Run ${{ github.run_id }}" \
             --url-only || echo "Gist creation failed"
+          
+          # Also create a raw log gist
+          gh gist create build.log --public \
+            --filename "build-log-run-${{ github.run_id }}.log" \
+            --description "iOS Build Log - Run ${{ github.run_id }}" \
+            --url-only || echo "Log gist creation failed"
 
       - name: Package IPA
         if: success()
@@ -87,8 +109,6 @@ jobs:
           
           if [ -z "$APP" ]; then
             echo "ERROR: No AdminDashboard.app found!"
-            echo "Build directory:"
-            ls -la build/Build/Products/ 2>/dev/null || echo "No Products dir"
             exit 1
           fi
           
@@ -102,6 +122,7 @@ jobs:
           
           echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
+          unzip -l AdminDashboard-unsigned.ipa | head -20
 
       - name: Upload IPA
         if: success()
