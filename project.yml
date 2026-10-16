@@ -15,6 +15,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.doushujun.admin
         TARGETED_DEVICE_FAMILY: "1"
         PRODUCT_NAME: AdminDashboard
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         GENERATE_INFOPLIST_FILE: NO
         ENABLE_USER_SCRIPT_SANDBOXING: NO
         INFOPLIST_FILE: AdminDashboard/Info.plist
