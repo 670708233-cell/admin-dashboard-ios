@@ -31,27 +31,20 @@ jobs:
           echo "=== Building ==="
           set -o pipefail
           
+          # Use the same destination as before that worked
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
             -configuration Release \
-            -sdk iphoneos \
-            -arch arm64 \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
             2>&1 | tee build.log
           
           EXIT_CODE=${PIPESTATUS[0]}
           echo "Build exit code: $EXIT_CODE"
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
-          
-          # Show errors
-          if [ $EXIT_CODE != 0 ]; then
-            echo "=== BUILD ERRORS ==="
-            grep -E "(error:|BUILD FAILED)" build.log | head -50
-          fi
 
       - name: Find App
         if: always()
@@ -63,19 +56,31 @@ jobs:
           done
 
       - name: Create Gist on Failure
-        if: steps.build.outputs.exit_code != '0'
+        if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Creating gist with build error ==="
-          echo "Exit code: ${{ steps.build.outputs.exit_code }}"
+          echo "=== Creating gist ==="
+          echo "Build exit code: ${{ steps.build.outputs.exit_code }}"
           
-          # Create gist using gh CLI
-          gh gist create build.log \
-            --public \
-            --filename "build-error.log" \
+          # Create gist with error info
+          cat > /tmp/error.md << EOF
+          # iOS Build Error
+          
+          **Run:** ${{ github.run_id }}
+          **Commit:** ${{ github.sha }}
+          
+          ## Build Log
+          
+          \`\`\`
+          $(tail -200 build.log 2>/dev/null || echo "No build.log")
+          \`\`\`
+          EOF
+          
+          gh gist create /tmp/error.md --public \
+            --filename "build-error.md" \
             --description "iOS Build Error - Run ${{ github.run_id }}" \
-            2>&1 || echo "Failed to create gist"
+            || echo "Failed to create gist"
 
       - name: Package IPA
         if: success()
