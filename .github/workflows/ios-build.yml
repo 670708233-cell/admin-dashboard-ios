@@ -40,18 +40,19 @@ jobs:
           echo "Build exit: $BUILD_EXIT"
           exit $BUILD_EXIT
 
-      - name: Surface build error
+      - name: Surface build error via GitHub Issue
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Committing build.log to ci-logs branch for inspection ==="
-          git config user.email "ci@github.com"
-          git config user.name "CI Bot"
-          cp build.log ci-build-error.log
-          git add ci-build-error.log
-          git commit -m "ci: build error log run ${{ github.run_id }}" || true
-          git push origin HEAD:ci-logs || true
+          echo "=== Creating public issue with build log ==="
+          ISSUE_TITLE="iOS Build Error - Run ${{ github.run_id }}"
+          ISSUE_BODY="Build log for run ${{ github.run_id }}:\n\n\`\`\`\n$(head -200 build.log)\n\`\`\`\n\nFull log: [build.log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          
+          gh issue create \
+            --title "$ISSUE_TITLE" \
+            --body "$ISSUE_BODY" \
+            --repo ${{ github.repository }} || echo "Failed to create issue"
 
       - name: Upload Build Log
         if: always()
