@@ -131,7 +131,7 @@ private struct FieldWithHint: View {
     @Binding var text: String
     var keyboard: UIKeyboardType = .default
     init(label: String, hint: String? = nil, keyboard: UIKeyboardType = .default, text: Binding<String>) {
-        self.label = label; self.hint = hint; self.keyboard = keyboard; self.text = text
+        self.label = label; self.hint = hint; self.keyboard = keyboard; _text = text
     }
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
