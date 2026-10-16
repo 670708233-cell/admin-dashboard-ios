@@ -22,14 +22,13 @@ jobs:
       - name: Generate Xcode project
         run: python3 generate_project.py
 
-      - name: Build with Detailed Output
+      - name: Build
         id: build_step
         continue-on-error: true
         run: |
           echo "=== Building with xcodebuild ==="
           set -o pipefail
           
-          # Use xcodebuild with verbose logging
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -38,80 +37,67 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            VERBOSE_XCODE_BUILD=1 \
             2>&1 | tee build.log
           
           BUILD_EXIT=${PIPESTATUS[0]}
           echo "Build exit: $BUILD_EXIT"
           echo "exit_code=$BUILD_EXIT" >> "$GITHUB_OUTPUT"
-          
-          # Show last 100 lines of log
-          echo "=== Last 100 lines of build log ==="
-          tail -100 build.log
-          
           exit $BUILD_EXIT
 
-      - name: Inspect Build Output
+      - name: Inspect Build
         if: always()
         run: |
-          echo "=== Build directory structure ==="
-          find build -type f -name "*.app" -o -name "*.ipa" -o -name "*.xcarchive" 2>/dev/null | head -20
+          echo "=== Build log tail ==="
+          tail -100 build.log 2>/dev/null || echo "No build.log"
           
           echo ""
-          echo "=== Build/Build/Products directory ==="
-          ls -la build/Build/Products/ 2>/dev/null || echo "No Products directory"
+          echo "=== Looking for .app ==="
+          find build -name "*.app" -type d 2>/dev/null | head -10
           
           echo ""
-          echo "=== Release-iphoneos contents ==="
-          ls -la build/Build/Products/Release-iphoneos/ 2>/dev/null || echo "No Release-iphoneos directory"
-          
-          echo ""
-          echo "=== Looking for .app bundles ==="
-          find build -name "*.app" -type d 2>/dev/null | while read app; do
-            echo "Found: $app"
-            echo "Size: $(du -sh "$app" 2>/dev/null | cut -f1)"
-            echo "Contents:"
-            ls -la "$app" 2>/dev/null | head -20
-            echo ""
-          done
-          
-          echo "=== Build log summary ==="
-          grep -E "(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)" build.log 2>/dev/null | head -30 || true
+          echo "=== Build Products ==="
+          ls -la build/Build/Products/ 2>/dev/null || echo "No Products dir"
 
-      - name: Create Public Debug File
-        if: always()
+      - name: Create Public Gist on Failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          cat > BUILD_DEBUG.md << 'EOF'
-          # iOS Build Debug Information
+          echo "=== Creating public gist with build error ==="
           
-          ## Run Details
-          - Run ID: RUN_ID_PLACEHOLDER
-          - Commit: COMMIT_SHA_PLACEHOLDER
-          - Branch: BRANCH_NAME_PLACEHOLDER
-          - Timestamp: TIMESTAMP_PLACEHOLDER
+          # Create gist with build log
+          gh gist create build.log \
+            --public \
+            --filename "build-error-run-${{ github.run_id }}.log" \
+            --description "iOS Build Error - Run ${{ github.run_id }}" \
+            || echo "Failed to create gist"
           
-          ## Build Log
-          ```
-          $(head -500 build.log 2>/dev/null || echo "No build.log")
-          ```
+          # Also create a summary file
+          cat > gist-summary.md << EOF
+          # iOS Build Error Summary
+          
+          **Run ID:** ${{ github.run_id }}
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+          
+          ## Error Details
+          
+          Build failed. See the attached log file for details.
+          
+          ## Build Log (first 200 lines)
+          
+          \`\`\`
+          $(head -200 build.log 2>/dev/null || echo "No build.log")
+          \`\`\`
           
           ## App Search Results
-          ```
-          $(find build -name "*.app" -type d 2>/dev/null | head -10 || echo "No .app found")
-          ```
           
-          ## Build Directory
-          ```
-          $(ls -la build/Build/Products/ 2>/dev/null || echo "No Products directory")
-          ```
+          \`\`\`
+          $(find build -name "*.app" -type d 2>/dev/null | head -10 || echo "No .app found")
+          \`\`\`
           EOF
           
-          sed -i "s/RUN_ID_PLACEHOLDER/${{ github.run_id }}/g" BUILD_DEBUG.md
-          sed -i "s/COMMIT_SHA_PLACEHOLDER/${{ github.sha }}/g" BUILD_DEBUG.md
-          sed -i "s/BRANCH_NAME_PLACEHOLDER/${{ github.ref_name }}/g" BUILD_DEBUG.md
-          sed -i "s/TIMESTAMP_PLACEHOLDER/${{ github.event.head_commit.timestamp }}/g" BUILD_DEBUG.md
-          
-          cat BUILD_DEBUG.md
+          gh gist edit ${{ github.run_id }} gist-summary.md --public 2>/dev/null || true
 
       - name: Package IPA
         if: success()
@@ -121,18 +107,14 @@ jobs:
           
           if [ -z "$APP" ]; then
             echo "ERROR: AdminDashboard.app not found!"
-            echo "All .app files found:"
-            find build -name "*.app" -type d 2>/dev/null
+            find build -name "*.app" 2>/dev/null
             exit 1
           fi
           
-          echo "=== Found app: $APP ==="
-          echo "App size:"
+          echo "=== Found: $APP ==="
           du -sh "$APP"
-          echo "Binary info:"
-          file "$APP/AdminDashboard" 2>/dev/null || echo "No binary"
+          file "$APP/AdminDashboard" 2>/dev/null
           
-          # Package IPA
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
@@ -140,10 +122,6 @@ jobs:
           
           echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
-          echo "IPA size: $(ls -lh AdminDashboard-unsigned.ipa | awk '{print $5}')"
-          
-          # Verify IPA contents
-          echo "=== IPA contents ==="
           unzip -l AdminDashboard-unsigned.ipa | head -20
 
       - name: Upload IPA
