@@ -259,7 +259,7 @@ struct PagerRow: View {
                 Text("跳到").font(.system(size: 13)).foregroundColor(.white.opacity(0.6))
                 TextField("页数", text: $jump)
                     .keyboardType(.numberPad)
-                    .textFieldStyle(TechFieldStyle())
+                    .modifier(TechFieldStyle())
                     .frame(width: 72)
                 Button("跳转") {
                     if let p = Int(jump.trimmingCharacters(in: .whitespaces)) {
@@ -303,11 +303,11 @@ struct TechButtonStyle: ButtonStyle {
 
 // MARK: - 输入框样式（霓虹聚焦）
 
-struct TechFieldStyle: TextFieldStyle {
+struct TechFieldStyle: ViewModifier {
     var isFocused = false
 
-    func _body(configuration: TextField<Self>) -> some View {
-        configuration
+    func body(content: Content) -> some View {
+        content
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .foregroundColor(.white)
@@ -316,6 +316,12 @@ struct TechFieldStyle: TextFieldStyle {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .strokeBorder(isFocused ? Tech.cyan : Color.white.opacity(0.18), lineWidth: 1)
             )
+    }
+}
+
+extension View {
+    func techFieldStyle(isFocused: Bool = false) -> some View {
+        self.modifier(TechFieldStyle(isFocused: isFocused))
     }
 }
 
