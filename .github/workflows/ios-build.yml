@@ -61,17 +61,54 @@ jobs:
           ls -la build/Build/Products/ 2>/dev/null || echo "No build/Build/Products directory"
           ls -la build/Build/Products/Release-iphoneos/ 2>/dev/null || echo "No Release-iphoneos directory"
 
-      - name: Create Public Gist with Build Log
-        if: failure()
+      - name: Create Public Debug File
+        if: always()
+        run: |
+          echo "=== Creating public debug file ==="
+          
+          # Create a markdown file with build info
+          cat > BUILD_DEBUG.md << 'EOF'
+          # iOS Build Debug Info
+          
+          ## Run Information
+          - Run ID: ${{ github.run_id }}
+          - Commit: ${{ github.sha }}
+          - Branch: ${{ github.ref_name }}
+          - Timestamp: ${{ github.event.head_commit.timestamp }}
+          
+          EOF
+          
+          # Append build log (first 500 lines)
+          if [ -f build.log ]; then
+            echo "## Build Log (first 500 lines)" >> BUILD_DEBUG.md
+            echo '```' >> BUILD_DEBUG.md
+            head -500 build.log >> BUILD_DEBUG.md
+            echo '```' >> BUILD_DEBUG.md
+          else
+            echo "No build.log found" >> BUILD_DEBUG.md
+          fi
+          
+          # Append app search results
+          echo "" >> BUILD_DEBUG.md
+          echo "## App Search Results" >> BUILD_DEBUG.md
+          find build -name "*.app" -type d 2>/dev/null | head -20 >> BUILD_DEBUG.md || echo "No .app found" >> BUILD_DEBUG.md
+          
+          echo "Created BUILD_DEBUG.md"
+          cat BUILD_DEBUG.md
+
+      - name: Commit Debug Info to Public Branch
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ -f build.log ]; then
-            gh gist create build.log --public \
-              --filename "build-error.log" \
-              --description "iOS Build Error for Run ${{ github.run_id }}" \
-              || echo "Failed to create gist"
-          fi
+          echo "=== Committing debug info to debug-logs branch ==="
+          git config user.email "ci@github.com"
+          git config user.name "CI Bot"
+          git checkout --orphan debug-logs 2>/dev/null || git checkout -b debug-logs
+          git rm -rf . 2>/dev/null || true
+          git add BUILD_DEBUG.md
+          git commit -m "debug: build info for run ${{ github.run_id }}" || true
+          git push origin debug-logs --force || echo "Failed to push to debug-logs"
 
       - name: Package IPA
         if: success()
@@ -91,10 +128,6 @@ jobs:
           du -sh "$APP"
           echo "App contents (first 30):"
           ls -la "$APP" | head -30
-          
-          # Check if it's a real binary or symlink
-          echo "App file type:"
-          file "$APP/AdminDashboard" 2>/dev/null || echo "No binary found"
           
           # Package IPA
           rm -rf Payload && mkdir Payload
