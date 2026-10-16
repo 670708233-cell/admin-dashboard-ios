@@ -19,30 +19,20 @@ jobs:
         run: xcodegen generate
 
       - name: Build
-        env:
-          CODE_SIGNING_ALLOWED: NO
-          CODE_SIGNING_REQUIRED: NO
-          DEVELOPMENT_TEAM: ""
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
-          xcodebuild -showsdks
           
-          echo "=== Project list ==="
-          xcodebuild -list -project AdminDashboard.xcodeproj || true
-          
-          echo "=== Building ==="
+          echo "=== Building with xcodebuild ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
-            -configuration Debug \
+            -configuration Release \
             -sdk iphoneos \
-            -arch arm64 \
-            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            ONLY_ACTIVE_ARCH=NO \
             2>&1 | tee build.log
           
           BUILD_EXIT=${PIPESTATUS[0]}
@@ -51,7 +41,6 @@ jobs:
             echo "=== Build FAILED ==="
             echo "Full build log saved to build.log"
           fi
-          echo "=== Build SUCCEEDED ==="
 
       - name: Upload Build Log
         if: always()
@@ -64,16 +53,16 @@ jobs:
       - name: Package IPA
         if: success()
         run: |
-          echo "=== Finding .app ==="
-          APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
-          echo "Found: $APP"
+          APP=$(find ~/Library/Developer/Xcode/DerivedData -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
+          if [ -z "$APP" ]; then
+            APP=$(find . -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
+          fi
+          echo "Found app: $APP"
           if [ -z "$APP" ]; then
             echo "ERROR: No .app found"
-            find build -name "*.app" 2>/dev/null | head -5
-            ls -la build/Build/Products/ 2>/dev/null || true
+            find . -name "*.app" -type d 2>/dev/null | head
             exit 1
           fi
-          echo "=== Packaging IPA ==="
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
