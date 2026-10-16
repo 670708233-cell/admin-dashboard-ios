@@ -23,7 +23,10 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.doushujun.admin
         TARGETED_DEVICE_FAMILY: "1,2"
-        PRODUCT_NAME: 抖数君后台
+        PRODUCT_NAME: AdminDashboard
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO
+        INFOPLIST_FILE: AdminDashboard/Info.plist
       configurations:
         Debug:
           SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
