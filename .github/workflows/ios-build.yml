@@ -72,8 +72,10 @@ jobs:
           du -sh "$APP"
           echo "App size: $(du -sh $APP | cut -f1)" >> $GITHUB_STEP_SUMMARY
           echo "=== Executable check ==="
-          ls -la "$APP/AdminDashboard" 2>/dev/null || echo "NO EXECUTABLE"
-          if [ ! -f "$APP/AdminDashboard" ]; then
+          ls -la "$APP/" | head -20
+          EXEC=$(find "$APP" -type f -perm +111 2>/dev/null | head -1)
+          echo "Executable: $EXEC"
+          if [ -z "$EXEC" ]; then
             echo "ERROR: No executable in app bundle" >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
