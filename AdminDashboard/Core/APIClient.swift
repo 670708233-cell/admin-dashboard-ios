@@ -46,7 +46,7 @@ final class APIClient {
         _ path: String,
         method: String = "GET",
         query: [URLQueryItem]? = nil,
-        body: (some Encodable)? = nil
+        body: (any Encodable)? = nil
     ) async throws -> T {
         var req = URLRequest(url: makeURL(path, query))
         req.httpMethod = method
@@ -77,7 +77,7 @@ final class APIClient {
     }
 
     /// 展开 ApiResp，data 为空时抛 empty
-    private func unwrap<T: Decodable>(_ path: String, method: String = "GET", query: [URLQueryItem]?, body: (some Encodable)? = nil) async throws -> T {
+    private func unwrap<T: Decodable>(_ path: String, method: String = "GET", query: [URLQueryItem]? = nil, body: (any Encodable)? = nil) async throws -> T {
         let resp: ApiResp<T> = try await perform(path, method: method, query: query, body: body)
         guard resp.code == 200 else { throw APIError.http(code: resp.code, msg: resp.msg ?? "") }
         guard let data = resp.data else { throw APIError.empty }

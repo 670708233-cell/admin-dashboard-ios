@@ -13,13 +13,17 @@ struct TechBackground: View {
                 // 流动光晕
                 Circle()
                     .fill(RadialGradient(colors: [Tech.blue.opacity(0.22), .clear],
-                                         startPoint: .center, endPoint: .radius(1.0)))
+                                         center: .center,
+                                         startRadius: 0,
+                                         endRadius: 230))
                     .frame(width: 460, height: 460)
                     .offset(x: -geo.size.width / 3 + CGFloat(phase) * 60,
                             y: -geo.size.height / 4)
                 Circle()
                     .fill(RadialGradient(colors: [Tech.purple.opacity(0.20), .clear],
-                                         startPoint: .center, endPoint: .radius(1.0)))
+                                         center: .center,
+                                         startRadius: 0,
+                                         endRadius: 210))
                     .frame(width: 420, height: 420)
                     .offset(x: geo.size.width / 3 - CGFloat(phase) * 50,
                             y: geo.size.height / 3)

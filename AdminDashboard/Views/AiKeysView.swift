@@ -77,7 +77,7 @@ struct AiKeysView: View {
         .onAppear { load() }
         .sheet(isPresented: $adding) {
             AiKeyEditSheet(key: nil) { name, provider, apiKey, remark in
-                run({ try await APIClient.shared.aiKeyAdd(AiKeyAddReq(name: name, provider: provider, apiKey: apiKey, remark: remark)) }, msg: "已添加")
+                run({ try await APIClient.shared.aiKeyAdd(AiKeyAddReq(name: name, provider: provider, apiKey: apiKey ?? "", remark: remark)) }, msg: "已添加")
             }
         }
         .sheet(item: $editing) { k in

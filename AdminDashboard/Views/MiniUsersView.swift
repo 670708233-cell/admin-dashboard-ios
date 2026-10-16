@@ -76,7 +76,7 @@ struct MiniUsersView: View {
                 primaryButton: .default(Text("确认")) {
                     Task {
                         do {
-                            try await APIClient.shared.miniSetVip(MiniSetVipReq(userId: u.userId ?? "", isVip: 0))
+                            try await APIClient.shared.miniSetVip(MiniSetVipReq(userId: u.userId ?? "", isVip: 0, packageId: nil, startDate: nil, endDate: nil))
                             showToast("已关闭VIP")
                             load()
                         } catch {
