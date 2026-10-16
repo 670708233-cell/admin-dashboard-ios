@@ -71,6 +71,8 @@
 			isa = PBXGroup;
 			children = (
 				30D54CC7AA2980CD24128CB0 /* AdminDashboardApp.swift */,
+				3E2A1D5F6D5A4F4E182D0B19 /* Core */,
+				194FEAEBF15D6CE048C1F13F /* Views */,
 				125DE18351D488FB2B9EB6A8 /* Info.plist */,
 			);
 			path = AdminDashboard;

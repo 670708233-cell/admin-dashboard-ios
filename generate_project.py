@@ -40,15 +40,23 @@ groups = {}  # group path -> (group_id, children_ids)
 
 # Create group structure
 def ensure_group(path_parts):
+    """Create (or fetch) the group for path_parts, recursively attaching it
+    to its parent group's children. Without attachment, subgroups become
+    orphans and Xcode resolves their file paths relative to the project root."""
     if not path_parts:
-        return None
+        return root_gid
     key = "/".join(path_parts)
     if key in groups:
         return groups[key][0]
-    
+
     gid = gen_id("group:" + key)
     children = []
     groups[key] = (gid, children)
+
+    # Attach this group to its parent (recursion creates ancestors too)
+    parent_key = "/".join(path_parts[:-1])
+    parent_gid = ensure_group(path_parts[:-1])
+    groups[parent_key][1].append(gid)
     return gid
 
 # Root group
@@ -69,19 +77,13 @@ for f in all_files:
     if f.endswith(".swift"):
         bid = gen_id("build:" + f)
         build_files[f] = bid
-    
-    # Group path
+
+    # Attach file to its parent group (ensure_group builds the whole chain)
     parts = f.split("/")
-    # Ensure parent group exists
     parent_parts = parts[:-1]
-    parent_gid = ensure_group(parent_parts) if parent_parts else root_gid
-    
-    # Add to parent group's children
+    ensure_group(parent_parts)
     parent_key = "/".join(parent_parts)
-    if parent_key in groups:
-        groups[parent_key][1].append(fid)
-    else:
-        groups[""][1].append(fid)
+    groups[parent_key][1].append(fid)
 
 # Generate project.pbxproj content
 lines = []
@@ -134,10 +136,18 @@ lines.append("/* Begin PBXGroup section */")
 lines.append(f"\t\t{root_gid} = {{")
 lines.append("\t\t\tisa = PBXGroup;")
 lines.append("\t\t\tchildren = (")
-# Add top-level groups (AdminDashboard dir)
-for key, (gid, children) in sorted(groups.items()):
-    if key and "/" not in key:
-        lines.append(f"\t\t\t\t{gid} /* {key} */,")
+
+def render_child(child):
+    """Render one child entry (file or group) for a group's children list."""
+    fid_to_name = {v: os.path.basename(k) for k, v in file_refs.items()}
+    gid_to_name = {g: k.split("/")[-1] for k, (g, _) in groups.items()}
+    if child in fid_to_name:
+        return f"\t\t\t\t{child} /* {fid_to_name[child]} */,"
+    return f"\t\t\t\t{child} /* {gid_to_name[child]} */,"
+
+# Root children = top-level groups/files (attached by ensure_group)
+for child in groups[""][1]:
+    lines.append(render_child(child))
 lines.append(f"\t\t\t\t{app_fid} /* AdminDashboard.app */,")
 lines.append("\t\t\t);")
 lines.append("\t\t\tsourceTree = \"<group>\";")
@@ -152,16 +162,7 @@ for key, (gid, children) in sorted(groups.items()):
     lines.append("\t\t\tisa = PBXGroup;")
     lines.append("\t\t\tchildren = (")
     for child in children:
-        # Find if this child is a file or group
-        is_file = child in file_refs.values()
-        if is_file:
-            # Find filename
-            fname = [k for k, v in file_refs.items() if v == child][0]
-            lines.append(f"\t\t\t\t{child} /* {os.path.basename(fname)} */,")
-        else:
-            # It's a group - find its name
-            gname = [k for k, (g, _) in groups.items() if g == child][0]
-            lines.append(f"\t\t\t\t{child} /* {gname.split('/')[-1]} */,")
+        lines.append(render_child(child))
     lines.append("\t\t\t);")
     lines.append(f"\t\t\tpath = {dirname};")
     lines.append("\t\t\tsourceTree = \"<group>\";")
