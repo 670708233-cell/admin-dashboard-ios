@@ -21,6 +21,7 @@ jobs:
           xcodebuild -version
           
           echo "=== Building with xcodebuild ==="
+          set -o pipefail
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -31,13 +32,14 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
-            2>&1 | tee build.log
+            | tee build.log
           
           BUILD_EXIT=${PIPESTATUS[0]}
           echo "Build exit: $BUILD_EXIT"
           if [ $BUILD_EXIT -ne 0 ]; then
             echo "=== Build FAILED ==="
             echo "Full build log saved to build.log"
+            exit $BUILD_EXIT
           fi
 
       - name: Upload Build Log
