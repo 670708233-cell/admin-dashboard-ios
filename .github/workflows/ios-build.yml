@@ -49,23 +49,11 @@ jobs:
             cat build.log
             echo "=== End of build log ==="
             
-            # Upload build log to a public gist for inspection
-            echo "Uploading build log to gist..."
-            LOG_CONTENT=$(cat build.log | base64)
-            GIST_PAYLOAD=$(cat <<EOF
-{
-  "public": true,
-  "files": {
-    "build_error.log": {
-      "content": "$(cat build.log | head -200)"
-    }
-  }
-}
-EOF
-)
-            curl -s -X POST -H "Accept: application/vnd.github+json" \
-              -d "$GIST_PAYLOAD" \
-              https://api.github.com/gists || echo "Gist upload failed"
+            # Write to step summary (publicly visible)
+            echo "## Build Failed" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            tail -100 build.log >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
             
             exit $BUILD_EXIT
           fi
