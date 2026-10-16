@@ -66,6 +66,10 @@ jobs:
           fi
           echo "=== App contents ==="
           ls -la "$APP"
+          echo "=== App size ==="
+          du -sh "$APP"
+          echo "=== Executable check ==="
+          ls -la "$APP/AdminDashboard" 2>/dev/null || echo "NO EXECUTABLE"
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
