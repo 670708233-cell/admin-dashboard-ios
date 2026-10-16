@@ -38,7 +38,9 @@ jobs:
           echo "Build exit: $BUILD_EXIT"
           if [ $BUILD_EXIT -ne 0 ]; then
             echo "=== Build FAILED ==="
-            echo "Full build log saved to build.log"
+            echo "=== Full build log ==="
+            cat build.log
+            echo "=== End of build log ==="
             exit $BUILD_EXIT
           fi
 
