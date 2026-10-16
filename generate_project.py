@@ -303,7 +303,7 @@ def build_config(config_id, name, is_target, is_debug):
         lines.append("\t\t\t\tPRODUCT_NAME = \"$(TARGET_NAME)\";")
         lines.append("\t\t\t\tSWIFT_VERSION = 5.0;")
         lines.append("\t\t\t\tSWIFT_STRICT_CONCURRENCY = minimal;")
-        lines.append("\t\t\t\tTARGETED_DEVICE_FAMILY = \"1,2\";")
+        lines.append("\t\t\t\tTARGETED_DEVICE_FAMILY = \"1\";")
     lines.append("\t\t\t};")
     lines.append(f"\t\t\tname = {name};")
     lines.append("\t\t};")

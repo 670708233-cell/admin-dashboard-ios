@@ -14,8 +14,9 @@ struct LoginView: View {
     private enum Field { case user, pwd }
 
     var body: some View {
-        TechBackground()
-        ScrollView {
+        ZStack {
+            TechBackground()
+            ScrollView {
             VStack(spacing: 0) {
                 Spacer(minLength: 40)
 
@@ -94,6 +95,7 @@ struct LoginView: View {
             )
             .shadow(color: Tech.cyan.opacity(0.3), radius: 18)
             .padding(.horizontal, 24)
+            }
         }
     }
 

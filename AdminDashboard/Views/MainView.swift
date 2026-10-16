@@ -138,7 +138,7 @@ struct MainView: View {
                     .padding(.top, 24)
                     .padding(.bottom, 12)
 
-                ScrollView {
+                VStack(spacing: 0) {
                     ForEach(Screen.allCases, id: \.self) { item in
                         Button {
                             screen = item

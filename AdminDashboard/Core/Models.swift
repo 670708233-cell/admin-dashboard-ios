@@ -466,32 +466,47 @@ struct CookieBatchDeleteReq: Encodable {
 
 // MARK: - 系统设置
 
-struct SiteStatus: Encodable {
-    let status: String
+/// 站点状态（对齐 Android SiteStatusReq，Gson snake_case 线格式）
+struct SiteStatusReq: Encodable {
+    let platform: String      // web / mini_program / alipay_mini
+    let isOpen: Int           // 1 开启 0 关闭
+    let closeMessage: String?
     let expectedReopenTime: String?
     enum CodingKeys: String, CodingKey {
-        case status
+        case platform
+        case isOpen = "is_open"
+        case closeMessage = "close_message"
         case expectedReopenTime = "expected_reopen_time"
     }
 }
 
+/// {id, setting_key, setting_value, description, status, updated_at}
 struct KeyValueSetting: Decodable, Identifiable {
     let id: Int?
-    let key: String?
-    let value: String?
-    let remark: String?
+    let settingKey: String?
+    let settingValue: String?
+    let description: String?
+    let status: Int?
     let updatedAt: String?
     enum CodingKeys: String, CodingKey {
-        case id, key, value, remark
+        case id, description, status
+        case settingKey = "setting_key"
+        case settingValue = "setting_value"
         case updatedAt = "updated_at"
     }
 }
 
 struct SettingUpdateReq: Encodable {
     let id: Int?
-    let key: String?
-    let value: String?
-    let remark: String?
+    let settingKey: String?
+    let settingValue: String?
+    let description: String?
+    enum CodingKeys: String, CodingKey {
+        case id
+        case settingKey = "setting_key"
+        case settingValue = "setting_value"
+        case description
+    }
 }
 
 struct SettingDeleteReq: Encodable {

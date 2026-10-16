@@ -191,7 +191,7 @@ final class APIClient {
         let _: PlainResp = try await perform("admin/settings/save", method: "POST", body: map)
     }
 
-    func siteStatus(_ req: SiteStatus) async throws { let _: PlainResp = try await perform("admin/settings/site_status", method: "POST", body: req) }
+    func siteStatus(_ req: SiteStatusReq) async throws { let _: PlainResp = try await perform("admin/settings/site_status", method: "POST", body: req) }
 
     func miniProgramSettings() async throws -> [KeyValueSetting] {
         try await unwrap("admin/mini_program/getSettings")
