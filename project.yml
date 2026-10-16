@@ -10,15 +10,6 @@ targets:
     deploymentTarget: "16.0"
     sources:
       - path: AdminDashboard
-    info:
-      path: AdminDashboard/Info.plist
-      properties:
-        CFBundleDisplayName: 抖数君后台
-        CFBundleShortVersionString: "1.0"
-        CFBundleVersion: "1"
-        UISupportedInterfaceOrientations: [Portrait]
-        NSAppTransportSecurity:
-          NSAllowsArbitraryLoads: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.doushujun.admin
