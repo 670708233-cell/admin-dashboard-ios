@@ -261,7 +261,7 @@ struct GrowthChart: View {
                             )
                             .foregroundStyle(color)
                             .lineStyle(StrokeStyle(lineWidth: 2.5))
-                            .symbol(Circle().strokeBorder(lineWidth: 2).foregroundStyle(color))
+                            .symbol(.circle)
                         }
                     }
                     .chartYAxis {
