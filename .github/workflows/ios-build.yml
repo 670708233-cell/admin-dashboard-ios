@@ -27,6 +27,9 @@ jobs:
           which xcodebuild
           ls -la /Applications/ | grep -i xcode || echo "NO XCODE IN APPLICATIONS"
           xcodebuild -version 2>&1 || echo "XCODEBUILD VERSION FAILED"
+          echo "=== Available Xcode versions ==="
+          ls /Applications/ | grep -i xcode || true
+          xcode-select -p || true
           
           # Try building with explicit destination (Xcode 15 compatible)
           xcodebuild build \
