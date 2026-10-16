@@ -22,14 +22,21 @@ jobs:
       - name: Generate Xcode project
         run: python3 generate_project.py
 
-      - name: Build
+      - name: Clean Build
+        run: |
+          echo "=== Cleaning derived data ==="
+          rm -rf build
+          mkdir -p build
+
+      - name: Build with Archive
         id: build_step
         continue-on-error: true
         run: |
-          echo "=== Building with xcodebuild ==="
+          echo "=== Building with xcodebuild (archive method) ==="
           set -o pipefail
           
-          xcodebuild build \
+          # Use archive instead of build for more reliable output
+          xcodebuild archive \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
             -configuration Release \
@@ -37,6 +44,8 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            SKIP_INSTALL=NO \
+            BUILD_LIBRARY_FOR_DISTRIBUTION=NO \
             2>&1 | tee build.log
           
           BUILD_EXIT=${PIPESTATUS[0]}
@@ -44,77 +53,55 @@ jobs:
           echo "exit_code=$BUILD_EXIT" >> "$GITHUB_OUTPUT"
           exit $BUILD_EXIT
 
-      - name: Inspect Build
+      - name: Inspect Archive Output
         if: always()
         run: |
-          echo "=== Build log tail ==="
-          tail -100 build.log 2>/dev/null || echo "No build.log"
+          echo "=== Build log summary ==="
+          grep -E "(error:|warning:|BUILD SUCCEEDED|BUILD FAILED|Archive succeeded)" build.log 2>/dev/null | head -50 || true
           
           echo ""
-          echo "=== Looking for .app ==="
+          echo "=== Looking for .app in DerivedData ==="
           find build -name "*.app" -type d 2>/dev/null | head -10
           
           echo ""
-          echo "=== Build Products ==="
-          ls -la build/Build/Products/ 2>/dev/null || echo "No Products dir"
+          echo "=== DerivedData structure ==="
+          ls -la build/ 2>/dev/null || echo "No build dir"
+          find build -name "*.xcarchive" -type d 2>/dev/null | head -5
+          
+          echo ""
+          echo "=== xcarchive contents ==="
+          find build -name "*.xcarchive" -type d 2>/dev/null | while read archive; do
+            echo "Found: $archive"
+            ls -la "$archive" 2>/dev/null
+            ls -la "$archive/Products" 2>/dev/null
+            ls -la "$archive/Products/Applications" 2>/dev/null
+          done
 
-      - name: Create Public Gist on Failure
-        if: failure()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "=== Creating public gist with build error ==="
-          
-          # Create gist with build log
-          gh gist create build.log \
-            --public \
-            --filename "build-error-run-${{ github.run_id }}.log" \
-            --description "iOS Build Error - Run ${{ github.run_id }}" \
-            || echo "Failed to create gist"
-          
-          # Also create a summary file
-          cat > gist-summary.md << EOF
-          # iOS Build Error Summary
-          
-          **Run ID:** ${{ github.run_id }}
-          **Commit:** ${{ github.sha }}
-          **Branch:** ${{ github.ref_name }}
-          
-          ## Error Details
-          
-          Build failed. See the attached log file for details.
-          
-          ## Build Log (first 200 lines)
-          
-          \`\`\`
-          $(head -200 build.log 2>/dev/null || echo "No build.log")
-          \`\`\`
-          
-          ## App Search Results
-          
-          \`\`\`
-          $(find build -name "*.app" -type d 2>/dev/null | head -10 || echo "No .app found")
-          \`\`\`
-          EOF
-          
-          gh gist edit ${{ github.run_id }} gist-summary.md --public 2>/dev/null || true
-
-      - name: Package IPA
+      - name: Package IPA from Archive
         if: success()
         run: |
-          echo "=== Looking for AdminDashboard.app ==="
-          APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
+          echo "=== Finding .app from archive ==="
           
-          if [ -z "$APP" ]; then
+          # Try to find .app in archive
+          APP=$(find build -name "*.xcarchive" -type d 2>/dev/null | head -1)
+          if [ -n "$APP" ]; then
+            APP="$APP/Products/Applications/AdminDashboard.app"
+            echo "Found archive app: $APP"
+          else
+            APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
+            echo "Found regular app: $APP"
+          fi
+          
+          if [ -z "$APP" ] || [ ! -d "$APP" ]; then
             echo "ERROR: AdminDashboard.app not found!"
-            find build -name "*.app" 2>/dev/null
             exit 1
           fi
           
-          echo "=== Found: $APP ==="
+          echo "=== App details ==="
           du -sh "$APP"
           file "$APP/AdminDashboard" 2>/dev/null
           
+          # Package IPA
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
