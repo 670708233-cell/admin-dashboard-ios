@@ -23,12 +23,14 @@ jobs:
           CODE_SIGNING_ALLOWED: NO
           CODE_SIGNING_REQUIRED: NO
           DEVELOPMENT_TEAM: ""
-          CODE_SIGN_IDENTITY: "-"
         run: |
           echo "=== Xcode version ==="
           xcodebuild -version
+          xcodebuild -showsdks
+          
           echo "=== Project list ==="
           xcodebuild -list -project AdminDashboard.xcodeproj || true
+          
           echo "=== Building ==="
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
@@ -36,11 +38,18 @@ jobs:
             -configuration Debug \
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
-            -derivedDataPath build
-          BUILD_EXIT=$?
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            DEVELOPMENT_TEAM="" \
+            2>&1 | tee build.log
+          
+          BUILD_EXIT=${PIPESTATUS[0]}
           echo "Build exit: $BUILD_EXIT"
           if [ $BUILD_EXIT -ne 0 ]; then
             echo "=== Build FAILED ==="
+            echo "Last 100 lines of build log:"
+            tail -100 build.log
             exit $BUILD_EXIT
           fi
           echo "=== Build SUCCEEDED ==="
