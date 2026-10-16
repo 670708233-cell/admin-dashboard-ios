@@ -22,10 +22,14 @@ jobs:
       - name: Generate Xcode project
         run: python3 generate_project.py
 
-      - name: Build
+      - name: Build and Capture Error
+        id: build_step
+        continue-on-error: true
         run: |
           echo "=== Building with xcodebuild ==="
           set -o pipefail
+          
+          # Run xcodebuild and capture all output
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -34,25 +38,47 @@ jobs:
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            | tee build.log
-
+            2>&1 | tee build.log
+          
           BUILD_EXIT=${PIPESTATUS[0]}
           echo "Build exit: $BUILD_EXIT"
+          
+          # Save exit code as output
+          echo "exit_code=$BUILD_EXIT" >> "$GITHUB_OUTPUT"
+          
+          # Show first 100 lines of error
+          echo "=== Build Error (first 100 lines) ==="
+          head -100 build.log
+          
           exit $BUILD_EXIT
 
-      - name: Surface build error via GitHub Issue
-        if: failure()
+      - name: Create Public Issue with Error
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Creating public issue with build log ==="
-          ISSUE_TITLE="iOS Build Error - Run ${{ github.run_id }}"
-          ISSUE_BODY="Build log for run ${{ github.run_id }}:\n\n\`\`\`\n$(head -200 build.log)\n\`\`\`\n\nFull log: [build.log](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          echo "=== Checking if build.log exists ==="
+          ls -la build.log 2>/dev/null || echo "No build.log found"
           
-          gh issue create \
-            --title "$ISSUE_TITLE" \
-            --body "$ISSUE_BODY" \
-            --repo ${{ github.repository }} || echo "Failed to create issue"
+          if [ -f build.log ]; then
+            ERROR_CONTENT=$(head -150 build.log | base64 -w0)
+            echo "Build log length: ${#ERROR_CONTENT} chars"
+            
+            # Decode and create issue
+            DECODED=$(echo "$ERROR_CONTENT" | base64 -d)
+            
+            ISSUE_TITLE="iOS Build Error - Run ${{ github.run_id }}"
+            ISSUE_BODY="### Build Log (first 150 lines)\n\n\`\`\`\n$DECODED\n\`\`\`\n\n**Run ID:** ${{ github.run_id }}\n**Commit:** ${{ github.sha }}"
+            
+            echo "Creating issue: $ISSUE_TITLE"
+            gh issue create \
+              --title "$ISSUE_TITLE" \
+              --body "$ISSUE_BODY" \
+              --repo ${{ github.repository }} \
+              || echo "Failed to create issue, exit code: $?"
+          else
+            echo "No build.log found, skipping issue creation"
+          fi
 
       - name: Upload Build Log
         if: always()
