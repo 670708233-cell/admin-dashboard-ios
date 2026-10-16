@@ -37,11 +37,12 @@ jobs:
             -scheme AdminDashboard \
             -configuration Debug \
             -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
+            -arch arm64 \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             DEVELOPMENT_TEAM="" \
+            ONLY_ACTIVE_ARCH=NO \
             2>&1 | tee build.log
           
           BUILD_EXIT=${PIPESTATUS[0]}
