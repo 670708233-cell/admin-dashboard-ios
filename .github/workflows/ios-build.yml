@@ -38,65 +38,99 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             2>&1 | tee build.log
           
-          EXIT_CODE=${PIPESTATUS[0]}
-          echo "Exit code: $EXIT_CODE"
-          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
-      - name: Check Build Status
+      - name: Find Built Products
         if: always()
         run: |
-          echo "Build exit code: ${{ steps.build.outputs.exit_code }}"
+          echo "=== Build log summary ==="
+          grep -E "(error:|BUILD SUCCEEDED|BUILD FAILED|Ld /|CodeSign)" build.log 2>/dev/null | head -50 || true
           
-          if [ "${{ steps.build.outputs.exit_code }}" != "0" ]; then
-            echo "BUILD FAILED"
-            echo "error=true" >> "$GITHUB_ENV"
-            
-            # Show error
-            echo "=== Build log tail ==="
-            tail -100 build.log
-          else
-            echo "BUILD SUCCEEDED"
-            echo "error=false" >> "$GITHUB_ENV"
-          fi
+          echo ""
+          echo "=== Searching for .app files ==="
+          find build -name "*.app" -type d 2>/dev/null | while read app; do
+            echo "Found: $app"
+            echo "Size: $(du -sh "$app" 2>/dev/null | cut -f1)"
+            echo "Contents:"
+            ls -la "$app" 2>/dev/null | head -15
+            echo ""
+          done
+          
+          echo "=== Build/Build/Products structure ==="
+          find build/Build/Products -type f -o -type d 2>/dev/null | head -50 || true
+          
+          echo "=== DerivedData root ==="
+          ls -la build/ 2>/dev/null || echo "No build directory"
 
       - name: Create Issue on Failure
-        if: env.error == 'true'
+        if: steps.build.outputs.exit_code != '0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Creating public issue ==="
-          
           LOG_PART=$(head -100 build.log | head -c 4000)
-          
           gh issue create \
             --title "iOS Build Failed - Run ${{ github.run_id }}" \
             --body "## Build Error
           
-          **Run ID:** ${{ github.run_id }}
           **Exit Code:** ${{ steps.build.outputs.exit_code }}
           
           ### Build Log
           \`\`\`
           $LOG_PART
           \`\`\`" \
-            --repo ${{ github.repository }} || echo "Failed to create issue"
+            --repo ${{ github.repository }} || true
 
       - name: Package IPA
         if: success()
         run: |
+          echo "=== Looking for AdminDashboard.app ==="
+          
+          # Try multiple possible locations
+          APP=""
+          
+          # Location 1: Direct search
           APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           
+          # Location 2: In Release-iphoneos
           if [ -z "$APP" ]; then
-            echo "ERROR: No .app found!"
+            APP=$(find build -path "*/Release-iphoneos/*.app" -type d 2>/dev/null | head -1)
+          fi
+          
+          # Location 3: Any .app
+          if [ -z "$APP" ]; then
+            APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
+          fi
+          
+          if [ -z "$APP" ]; then
+            echo "ERROR: No .app file found in build directory!"
+            echo "Build directory contents:"
+            ls -R build/Build/Products/ 2>/dev/null || echo "No Products directory"
             exit 1
           fi
           
+          echo "=== Found app: $APP ==="
+          echo "Size:"
+          du -sh "$APP"
+          
+          # Check binary
+          if [ -f "$APP/AdminDashboard" ]; then
+            echo "Binary exists:"
+            file "$APP/AdminDashboard"
+            ls -lh "$APP/AdminDashboard"
+          else
+            echo "WARNING: No binary in .app"
+            ls -la "$APP"
+          fi
+          
+          # Package IPA
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           
+          echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
+          unzip -l AdminDashboard-unsigned.ipa | head -20
 
       - name: Upload IPA
         if: success()
