@@ -55,10 +55,12 @@ struct MainView: View {
                     .onTapGesture { withAnimation(.spring()) { drawerOpen = false } }
             }
 
-            // 抽屉
+            // 抽屉（关闭时彻底隐藏，避免任何中间态残留在屏幕上）
             drawer
                 .frame(width: drawerWidth)
                 .offset(x: drawerOpen ? 0 : -drawerWidth)
+                .opacity(drawerOpen ? 1 : 0)
+                .allowsHitTesting(drawerOpen)
 
             // Toast
             if let toast {
@@ -79,7 +81,7 @@ struct MainView: View {
             }
 
             // TODO 临时几何调试（定位窗口尺寸异常后删除）
-            GeomDebugView()
+            GeomDebugView(drawerOpen: drawerOpen)
         }
         .animation(.spring(), value: drawerOpen)
         .sheet(isPresented: $showChangePwd) {
@@ -263,14 +265,18 @@ struct ChangePasswordSheet: View {
 
 /// 临时几何调试覆盖层（定位窗口尺寸异常后删除）
 private struct GeomDebugView: View {
+    var drawerOpen: Bool = false
     @State private var winInfo = "win: ?"
     @State private var screenInfo = "screen: ?"
+    @State private var launchBounds = ""
 
     var body: some View {
         GeometryReader { geo in
             VStack(alignment: .leading, spacing: 2) {
+                Text("BLD-1017A")
                 Text("geo: \(Int(geo.size.width))x\(Int(geo.size.height))")
                 Text("safe: \(Int(geo.safeAreaInsets.leading)),\(Int(geo.safeAreaInsets.top))")
+                Text("open: \(drawerOpen) launch: \(launchBounds)")
                 Text(screenInfo)
                 Text(winInfo)
             }
@@ -279,7 +285,10 @@ private struct GeomDebugView: View {
             .padding(6)
             .background(RoundedRectangle(cornerRadius: 6).fill(Color.black.opacity(0.65)))
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
-            .onAppear { refresh() }
+            .onAppear {
+                if launchBounds.isEmpty { launchBounds = "\(UIScreen.main.bounds.size)" }
+                refresh()
+            }
             .onTapGesture { refresh() }
         }
         .allowsHitTesting(true)
