@@ -23,15 +23,12 @@ jobs:
           echo "=== Building with xcodebuild ==="
           set -o pipefail
           
-          # Diagnostic: show build settings
-          echo "=== Build settings ==="
-          xcodebuild -project AdminDashboard.xcodeproj -scheme AdminDashboard -showBuildSettings 2>&1 | head -50
-          
+          # Try building with explicit destination (Xcode 15 compatible)
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
             -configuration Release \
-            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
