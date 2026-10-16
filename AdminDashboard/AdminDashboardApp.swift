@@ -15,10 +15,6 @@ struct AdminDashboardApp: App {
             }
             .environmentObject(auth)
             .preferredColorScheme(.dark)
-            // 强制布局尺寸与物理屏幕一致：防止系统/测试版系统给出异常窗口尺寸
-            .frame(width: UIScreen.main.bounds.width,
-                   height: UIScreen.main.bounds.height)
-            .clipped()
         }
     }
 }
