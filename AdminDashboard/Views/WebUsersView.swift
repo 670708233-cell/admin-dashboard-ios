@@ -71,7 +71,7 @@ struct WebUsersView: View {
         .onAppear { load() }
         // 确认类操作（超级VIP/关闭/删除）
         .alert(item: confirmAlertItem) { item in
-            switch item.wrappedValue {
+            switch item {
             case .superVip:
                 return Alert(
                     title: Text("设为超级VIP"),
@@ -100,12 +100,12 @@ struct WebUsersView: View {
         // 输入类操作
         .sheet(item: inputSheetItem) { item in
             InputActionSheet(
-                title: item.wrappedValue.inputLabel,
+                title: item.inputLabel,
                 subtitle: "用户：\(actionTarget?.username ?? "-")",
-                secure: item.wrappedValue == .pwd,
-                keyboard: item.wrappedValue == .balance ? .decimalPad : .numberPad,
+                secure: item == .pwd,
+                keyboard: item == .balance ? .decimalPad : .numberPad,
                 text: $input,
-                onConfirm: { runAction(item.wrappedValue) }
+                onConfirm: { runAction(item) }
             )
             .presentationDetents([.medium])
         }

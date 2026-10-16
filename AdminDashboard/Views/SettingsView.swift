@@ -213,7 +213,7 @@ struct KeyValueSection: View {
                                     onSave: { v in
                             Task {
                                 do {
-                                    try await save(SettingUpdateReq(id: s.id, key: s.key, value: v))
+                                    try await save(SettingUpdateReq(id: s.id, key: s.key, value: v, remark: nil))
                                     toast = "已保存"
                                     await reload()
                                 } catch { toast = error.localizedDescription }
@@ -241,21 +241,14 @@ struct KeyValueSection: View {
                 VStack(alignment: .leading, spacing: 14) {
                     LabeledField(label: "键(key)", text: $newKey)
                     LabeledField(label: "值(value)", text: $newValue)
-                    Spacer()
-                }
-                .padding(20)
-                .background(Tech.bgBottom.ignoresSafeArea())
-                .navigationTitle("新增 \(title)")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") { adding = false }.foregroundColor(Tech.cyan)
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
+                    HStack {
+                        Button("取消") { adding = false }
+                            .foregroundColor(Tech.cyan)
+                        Spacer()
                         Button("确定") {
                             Task {
                                 do {
-                                    try await save(SettingUpdateReq(id: nil, key: newKey, value: newValue))
+                                    try await save(SettingUpdateReq(id: nil, key: newKey, value: newValue, remark: nil))
                                     toast = "已保存"
                                     await reload()
                                 } catch { toast = error.localizedDescription }
@@ -265,7 +258,12 @@ struct KeyValueSection: View {
                         .foregroundColor(Tech.cyan)
                         .disabled(newKey.isEmpty)
                     }
+                    Spacer()
                 }
+                .padding(20)
+                .background(Tech.bgBottom.ignoresSafeArea())
+                .navigationTitle("新增 \(title)")
+                .navigationBarTitleDisplayMode(.inline)
             }
         }
         .overlay(toastOverlay)
