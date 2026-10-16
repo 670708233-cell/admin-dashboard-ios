@@ -53,7 +53,7 @@ jobs:
         run: |
           echo "=== Looking for .app ==="
           find build -name "*.app" -type d 2>/dev/null
-          APP=$(find build -name "AdminDashboard.app" -type d 2>/dev4vnull | head -1)
+          APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           if [ -z "$APP" ]; then
             APP=$(find build -name "*.app" -type d 2>/dev/null | head -1)
           fi
