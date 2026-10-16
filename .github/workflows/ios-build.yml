@@ -29,6 +29,7 @@ jobs:
             -scheme AdminDashboard \
             -configuration Release \
             -sdk iphoneos \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -53,16 +54,18 @@ jobs:
       - name: Package IPA
         if: success()
         run: |
-          APP=$(find ~/Library/Developer/Xcode/DerivedData -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
-          if [ -z "$APP" ]; then
-            APP=$(find . -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
-          fi
+          echo "=== Looking for .app ==="
+          find build -name "*.app" -type d 2>/dev/null
+          APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           echo "Found app: $APP"
           if [ -z "$APP" ]; then
-            echo "ERROR: No .app found"
-            find . -name "*.app" -type d 2>/dev/null | head
+            echo "ERROR: No .app found in build/"
+            find build -maxdepth 3 -name "*.app" 2>/dev/null | head
+            ls -la build/Build/Products/Release-iphoneos/ 2>/dev/null || true
             exit 1
           fi
+          echo "=== App contents ==="
+          ls -la "$APP"
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
