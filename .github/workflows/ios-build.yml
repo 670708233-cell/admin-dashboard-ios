@@ -61,54 +61,61 @@ jobs:
           ls -la build/Build/Products/ 2>/dev/null || echo "No build/Build/Products directory"
           ls -la build/Build/Products/Release-iphoneos/ 2>/dev/null || echo "No Release-iphoneos directory"
 
-      - name: Create Public Debug File
+      - name: Update README with Build Info
         if: always()
         run: |
-          echo "=== Creating public debug file ==="
+          echo "=== Updating README with build info ==="
           
-          # Create a markdown file with build info
-          cat > BUILD_DEBUG.md << 'EOF'
-          # iOS Build Debug Info
+          # Create build info section
+          BUILD_INFO="<!-- BEGIN_BUILD_INFO -->
           
-          ## Run Information
-          - Run ID: ${{ github.run_id }}
-          - Commit: ${{ github.sha }}
-          - Branch: ${{ github.ref_name }}
-          - Timestamp: ${{ github.event.head_commit.timestamp }}
+          ## Build Status
+          - **Run ID**: ${{ github.run_id }}
+          - **Commit**: \`${{ github.sha }}\`
+          - **Branch**: \`${{ github.ref_name }}\`
+          - **Timestamp**: ${{ github.event.head_commit.timestamp }}
+          - **Exit Code**: ${{ steps.build_step.outputs.exit_code }}
           
-          EOF
+          "
           
-          # Append build log (first 500 lines)
+          # Append build log if exists
           if [ -f build.log ]; then
-            echo "## Build Log (first 500 lines)" >> BUILD_DEBUG.md
-            echo '```' >> BUILD_DEBUG.md
-            head -500 build.log >> BUILD_DEBUG.md
-            echo '```' >> BUILD_DEBUG.md
+            BUILD_INFO+="### Build Log (first 300 lines)
+          
+          \`\`\`
+          $(head -300 build.log)
+          \`\`\`
+          
+          "
           else
-            echo "No build.log found" >> BUILD_DEBUG.md
+            BUILD_INFO+="No build.log found
+          
+          "
           fi
           
           # Append app search results
-          echo "" >> BUILD_DEBUG.md
-          echo "## App Search Results" >> BUILD_DEBUG.md
-          find build -name "*.app" -type d 2>/dev/null | head -20 >> BUILD_DEBUG.md || echo "No .app found" >> BUILD_DEBUG.md
+          BUILD_INFO+="### App Search Results
           
-          echo "Created BUILD_DEBUG.md"
+          \`\`\`
+          $(find build -name "*.app" -type d 2>/dev/null | head -10 || echo "No .app found")
+          \`\`\`
+          
+          <!-- END_BUILD_INFO -->"
+          
+          # Write to README
+          echo "$BUILD_INFO" > BUILD_DEBUG.md
           cat BUILD_DEBUG.md
-
-      - name: Commit Debug Info to Public Branch
-        if: always()
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "=== Committing debug info to debug-logs branch ==="
-          git config user.email "ci@github.com"
-          git config user.name "CI Bot"
-          git checkout --orphan debug-logs 2>/dev/null || git checkout -b debug-logs
-          git rm -rf . 2>/dev/null || true
-          git add BUILD_DEBUG.md
-          git commit -m "debug: build info for run ${{ github.run_id }}" || true
-          git push origin debug-logs --force || echo "Failed to push to debug-logs"
+          
+          # Update README.md (prepend build info)
+          if [ -f README.md ]; then
+            cat README.md > README_BACKUP.md
+          else
+            echo "# Admin Dashboard iOS" > README_BACKUP.md
+          fi
+          
+          cat BUILD_DEBUG.md README_BACKUP.md > README.md
+          echo "Updated README.md"
+          ls -la README.md
 
       - name: Package IPA
         if: success()
