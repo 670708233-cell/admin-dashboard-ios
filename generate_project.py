@@ -10,18 +10,23 @@ import uuid
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR = os.path.join(BASE_DIR, "AdminDashboard")
 
-# Collect all Swift files
+# Collect all Swift files and Info.plist
 swift_files = []
+plist_files = []
 for root, dirs, files in os.walk(SRC_DIR):
     for f in sorted(files):
+        full = os.path.join(root, f)
+        rel = os.path.relpath(full, BASE_DIR).replace("\\", "/")
         if f.endswith(".swift"):
-            full = os.path.join(root, f)
-            rel = os.path.relpath(full, BASE_DIR).replace("\\", "/")
             swift_files.append(rel)
+        elif f == "Info.plist":
+            plist_files.append(rel)
 
-print(f"Found {len(swift_files)} Swift files:")
+print(f"Found {len(swift_files)} Swift files and {len(plist_files)} plist files:")
 for sf in swift_files:
     print(f"  {sf}")
+for pf in plist_files:
+    print(f"  {pf}")
 
 # Generate unique 24-char hex IDs
 def gen_id(seed):
@@ -51,17 +56,18 @@ root_gid = gen_id("group:ROOT")
 groups[""] = (root_gid, [])
 
 # Process files
-for sf in swift_files:
+all_files = swift_files + plist_files
+for f in all_files:
     # File reference
-    fid = gen_id("file:" + sf)
-    file_refs[sf] = fid
+    fid = gen_id("file:" + f)
+    file_refs[f] = fid
     
     # Build file reference
-    bid = gen_id("build:" + sf)
-    build_files[sf] = bid
+    bid = gen_id("build:" + f)
+    build_files[f] = bid
     
     # Group path
-    parts = sf.split("/")
+    parts = f.split("/")
     # Ensure parent group exists
     parent_parts = parts[:-1]
     parent_gid = ensure_group(parent_parts) if parent_parts else root_gid
@@ -88,16 +94,21 @@ lines.append("")
 lines.append("/* Begin PBXFileReference section */")
 app_fid = gen_id("file:AdminDashboard.app")
 lines.append(f"\t\t{app_fid} /* AdminDashboard.app */ = {{isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AdminDashboard.app; sourceTree = BUILT_PRODUCTS_DIR; }};")
-for sf, fid in sorted(file_refs.items()):
-    lines.append(f"\t\t{fid} /* {os.path.basename(sf)} */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {os.path.basename(sf)}; sourceTree = \"<group>\"; }};")
+for f, fid in sorted(file_refs.items()):
+    basename = os.path.basename(f)
+    if f.endswith(".swift"):
+        lines.append(f"\t\t{fid} /* {basename} */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = {basename}; sourceTree = \"<group>\"; }};")
+    elif f.endswith(".plist"):
+        lines.append(f"\t\t{fid} /* {basename} */ = {{isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = {basename}; sourceTree = \"<group>\"; }};")
 lines.append("/* End PBXFileReference section */")
 lines.append("")
 
 # PBXBuildFile section
 lines.append("/* Begin PBXBuildFile section */")
-for sf, bid in sorted(build_files.items()):
-    fid = file_refs[sf]
-    lines.append(f"\t\t{bid} /* {os.path.basename(sf)} in Sources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {os.path.basename(sf)} */; }};")
+for f, bid in sorted(build_files.items()):
+    fid = file_refs[f]
+    basename = os.path.basename(f)
+    lines.append(f"\t\t{bid} /* {basename} in Sources */ = {{isa = PBXBuildFile; fileRef = {fid} /* {basename} */; }};")
 lines.append("/* End PBXBuildFile section */")
 lines.append("")
 
@@ -213,12 +224,16 @@ lines.append("\t\t};")
 lines.append("/* End PBXProject section */")
 lines.append("")
 
-# PBXResourcesBuildPhase section
+# PBXResourcesBuildPhase section - INCLUDE Info.plist
 lines.append("/* Begin PBXResourcesBuildPhase section */")
 lines.append(f"\t\t{res_phase_id} /* Resources */ = {{")
 lines.append("\t\t\tisa = PBXResourcesBuildPhase;")
 lines.append("\t\t\tbuildActionMask = 2147483647;")
 lines.append("\t\t\tfiles = (")
+# Add Info.plist to resources
+for pf in plist_files:
+    bid = build_files[pf]
+    lines.append(f"\t\t\t\t{bid} /* {os.path.basename(pf)} in Resources */,")
 lines.append("\t\t\t);")
 lines.append("\t\t\trunOnlyForDeploymentPostprocessing = 0;")
 lines.append("\t\t};")
@@ -232,7 +247,8 @@ lines.append("\t\t\tisa = PBXSourcesBuildPhase;")
 lines.append("\t\t\tbuildActionMask = 2147483647;")
 lines.append("\t\t\tfiles = (")
 for sf, bid in sorted(build_files.items()):
-    lines.append(f"\t\t\t\t{bid} /* {os.path.basename(sf)} in Sources */,")
+    if sf.endswith(".swift"):
+        lines.append(f"\t\t\t\t{bid} /* {os.path.basename(sf)} in Sources */,")
 lines.append("\t\t\t);")
 lines.append("\t\t\trunOnlyForDeploymentPostprocessing = 0;")
 lines.append("\t\t};")
@@ -335,4 +351,5 @@ out_path = os.path.join(xcodeproj_dir, "project.pbxproj")
 with open(out_path, "w", encoding="utf-8") as f:
     f.write("\n".join(lines))
 print(f"\nGenerated: {out_path}")
-print(f"Total files: {len(swift_files)}")
+print(f"Total Swift files: {len(swift_files)}")
+print(f"Total plist files: {len(plist_files)}")
