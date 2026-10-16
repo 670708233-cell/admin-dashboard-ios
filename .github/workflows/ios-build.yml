@@ -22,14 +22,13 @@ jobs:
       - name: Generate Xcode project
         run: python3 generate_project.py
 
-      - name: Build and Capture Error
+      - name: Build
         id: build_step
         continue-on-error: true
         run: |
           echo "=== Building with xcodebuild ==="
           set -o pipefail
           
-          # Run xcodebuild and capture all output
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
@@ -42,42 +41,39 @@ jobs:
           
           BUILD_EXIT=${PIPESTATUS[0]}
           echo "Build exit: $BUILD_EXIT"
-          
-          # Save exit code as output
           echo "exit_code=$BUILD_EXIT" >> "$GITHUB_OUTPUT"
-          
-          # Show first 100 lines of error
-          echo "=== Build Error (first 100 lines) ==="
-          head -100 build.log
-          
           exit $BUILD_EXIT
 
-      - name: Create Public Issue with Error
+      - name: Create Public Gist with Build Log
         if: always()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          echo "=== Checking if build.log exists ==="
-          ls -la build.log 2>/dev/null || echo "No build.log found"
+          echo "=== Creating public gist with build log ==="
           
-          if [ -f build.log ]; then
-            ERROR_CONTENT=$(head -150 build.log | base64 -w0)
-            echo "Build log length: ${#ERROR_CONTENT} chars"
-            
-            # Decode and create issue
-            DECODED=$(echo "$ERROR_CONTENT" | base64 -d)
-            
-            ISSUE_TITLE="iOS Build Error - Run ${{ github.run_id }}"
-            ISSUE_BODY="### Build Log (first 150 lines)\n\n\`\`\`\n$DECODED\n\`\`\`\n\n**Run ID:** ${{ github.run_id }}\n**Commit:** ${{ github.sha }}"
-            
-            echo "Creating issue: $ISSUE_TITLE"
-            gh issue create \
-              --title "$ISSUE_TITLE" \
-              --body "$ISSUE_BODY" \
-              --repo ${{ github.repository }} \
-              || echo "Failed to create issue, exit code: $?"
+          # Check if build.log exists
+          if [ ! -f build.log ]; then
+            echo "No build.log found"
+            # Create empty file with timestamp
+            echo "Build log not found at $(date)" > build.log
+          fi
+          
+          # Create gist
+          GIST_URL=$(gh gist create build.log --public \
+            --filename "build-log-run-${{ github.run_id }}.log" \
+            --description "iOS Build Error Log for Run ${{ github.run_id }}" \
+            2>&1) || true
+          
+          echo "Gist creation result: $GIST_URL"
+          
+          # Extract gist URL from output
+          if echo "$GIST_URL" | grep -q "https://gist.github.com"; then
+            GIST_ID=$(echo "$GIST_URL" | grep -oE '[a-f0-9]{20,}' | head -1)
+            echo "GIST_URL=https://gist.github.com/$GIST_ID" >> "$GITHUB_ENV"
+            echo "Public build log: https://gist.github.com/$GIST_ID"
           else
-            echo "No build.log found, skipping issue creation"
+            echo "Failed to create gist"
+            echo "Raw output: $GIST_URL"
           fi
 
       - name: Upload Build Log
