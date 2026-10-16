@@ -22,6 +22,11 @@ jobs:
           
           echo "=== Building with xcodebuild ==="
           set -o pipefail
+          
+          # Diagnostic: show build settings
+          echo "=== Build settings ==="
+          xcodebuild -project AdminDashboard.xcodeproj -scheme AdminDashboard -showBuildSettings 2>&1 | head -50
+          
           xcodebuild build \
             -project AdminDashboard.xcodeproj \
             -scheme AdminDashboard \
