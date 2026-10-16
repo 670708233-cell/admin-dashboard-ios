@@ -51,9 +51,6 @@ jobs:
         if: always()
         run: |
           echo "=== Looking for .app ==="
-          APP_COUNT=$(find build -name "*.app" -type d 2>/dev/null | wc -l)
-          echo "Found $APP_COUNT .app files"
-          
           find build -name "*.app" -type d 2>/dev/null | while read app; do
             echo "Found: $app"
             du -sh "$app"
@@ -63,14 +60,9 @@ jobs:
           echo ""
           echo "=== Build Products ==="
           find build/Build/Products -type f 2>/dev/null | head -20
-          
-          echo ""
-          echo "=== Build Log Summary ==="
-          grep -E "(BUILD SUCCEEDED|BUILD FAILED|error:)" build.log 2>/dev/null | head -20 || true
 
       - name: Package IPA
         id: package
-        continue-on-error: true
         run: |
           echo "=== Packaging IPA ==="
           APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
@@ -88,58 +80,17 @@ jobs:
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           
-          echo "=== IPA created ==="
-          ls -lh AdminDashboard-unsigned.ipa
-          unzip -l AdminDashboard-unsigned.ipa | head -20
-          
-          echo "success=true" >> "$GITHUB_OUTPUT"
-
-      - name: Create Gist on Failure
-        if: steps.package.outcome == 'failure' || steps.build.outputs.exit_code != '0'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          echo "=== Creating gist with error ==="
-          
-          # Collect error info
-          BUILD_LOG=$(tail -200 build.log 2>/dev/null || echo "No build.log")
-          APP_SEARCH=$(find build -name "*.app" -type d 2>/dev/null | head -10 || echo "No .app found")
-          PRODUCTS=$(ls -la build/Build/Products/ 2>/dev/null || echo "No Products dir")
-          
-          # Create summary
-          cat > /tmp/error-summary.md << EOF
-          # iOS Build Error
-          
-          **Run:** ${{ github.run_id }}
-          **Commit:** ${{ github.sha }}
-          
-          ## Build Log (last 200 lines)
-          
-          \`\`\`
-          $BUILD_LOG
-          \`\`\`
-          
-          ## App Search Results
-          
-          \`\`\`
-          $APP_SEARCH
-          \`\`\`
-          
-          ## Products Directory
-          
-          \`\`\`
-          $PRODUCTS
-          \`\`\`
-          EOF
-          
-          # Upload to gist
-          gh gist create /tmp/error-summary.md --public \
-            --filename "build-error.md" \
-            --description "iOS Build Error - Run ${{ github.run_id }}" \
-            --url-only || echo "Failed to create gist"
+          if [ -f AdminDashboard-unsigned.ipa ]; then
+            echo "=== IPA created successfully ==="
+            ls -lh AdminDashboard-unsigned.ipa
+            unzip -l AdminDashboard-unsigned.ipa | head -20
+          else
+            echo "ERROR: IPA file not created!"
+            exit 1
+          fi
 
       - name: Upload IPA
-        if: steps.package.outputs.success == 'true'
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: AdminDashboard-unsigned
