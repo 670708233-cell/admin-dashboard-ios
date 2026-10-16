@@ -41,19 +41,50 @@ jobs:
           echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
 
       - name: Check Build Result
+        id: check
         run: |
           if [ "${{ steps.build.outputs.exit_code }}" != "0" ]; then
             echo "BUILD FAILED with exit code ${{ steps.build.outputs.exit_code }}"
-            echo "=== Last 100 lines of build log ==="
-            tail -100 build.log
-            exit "${{ steps.build.outputs.exit_code }}"
+            echo "error=true" >> "$GITHUB_OUTPUT"
+            
+            echo "=== Build log tail ==="
+            tail -150 build.log
+          else
+            echo "BUILD SUCCEEDED"
+            echo "error=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Create Public Gist on Failure
+        if: steps.check.outputs.error == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          echo "=== Creating public gist with build error ==="
           
-          echo "=== BUILD SUCCEEDED ==="
-          echo "=== Looking for .app ==="
-          find build -name "*.app" -type d 2>/dev/null | while read app; do
-            echo "Found: $app ($(du -sh "$app" | cut -f1))"
-          done
+          # Create a summary file
+          cat > gist-summary.md << EOF
+          # iOS Build Error
+          
+          **Run:** ${{ github.run_id }}
+          **Commit:** ${{ github.sha }}
+          **Branch:** ${{ github.ref_name }}
+          
+          ## Error
+          
+          Build failed with exit code ${{ steps.build.outputs.exit_code }}
+          
+          ## Build Log (last 200 lines)
+          
+          \`\`\`
+          $(tail -200 build.log)
+          \`\`\`
+          EOF
+          
+          # Create gist
+          gh gist create gist-summary.md --public \
+            --filename "build-error.md" \
+            --description "iOS Build Error - Run ${{ github.run_id }}" \
+            || echo "Failed to create gist"
 
       - name: Package IPA
         if: success()
@@ -75,7 +106,6 @@ jobs:
           
           echo "=== IPA created ==="
           ls -lh AdminDashboard-unsigned.ipa
-          unzip -l AdminDashboard-unsigned.ipa | head -20
 
       - name: Upload IPA
         if: success()
