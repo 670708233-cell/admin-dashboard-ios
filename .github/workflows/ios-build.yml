@@ -54,12 +54,14 @@ jobs:
       - name: Package IPA
         if: success()
         run: |
-          echo "=== Looking for .app ==="
+          echo "=== Looking for .app ===" >> $GITHUB_STEP_SUMMARY
           find build -name "*.app" -type d 2>/dev/null
           APP=$(find build -name "AdminDashboard.app" -type d 2>/dev/null | head -1)
           echo "Found app: $APP"
+          echo "Found app: $APP" >> $GITHUB_STEP_SUMMARY
           if [ -z "$APP" ]; then
             echo "ERROR: No .app found in build/"
+            echo "ERROR: No .app found in build/" >> $GITHUB_STEP_SUMMARY
             find build -maxdepth 3 -name "*.app" 2>/dev/null | head
             ls -la build/Build/Products/Release-iphoneos/ 2>/dev/null || true
             exit 1
@@ -68,13 +70,19 @@ jobs:
           ls -la "$APP"
           echo "=== App size ==="
           du -sh "$APP"
+          echo "App size: $(du -sh $APP | cut -f1)" >> $GITHUB_STEP_SUMMARY
           echo "=== Executable check ==="
           ls -la "$APP/AdminDashboard" 2>/dev/null || echo "NO EXECUTABLE"
+          if [ ! -f "$APP/AdminDashboard" ]; then
+            echo "ERROR: No executable in app bundle" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
           rm -rf Payload && mkdir Payload
           cp -R "$APP" Payload/
           zip -qr AdminDashboard-unsigned.ipa Payload/
           rm -rf Payload
           ls -lh AdminDashboard-unsigned.ipa
+          echo "IPA size: $(ls -lh AdminDashboard-unsigned.ipa | awk '{print $5}')" >> $GITHUB_STEP_SUMMARY
 
       - name: Upload
         uses: actions/upload-artifact@v4
