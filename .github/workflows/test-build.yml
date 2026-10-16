@@ -1,0 +1,57 @@
+name: Test Minimal iOS Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-14
+    steps:
+      - name: Create minimal project
+        run: |
+          mkdir -p TestApp
+          cat > TestApp/ContentView.swift <<'EOF'
+          import SwiftUI
+
+          struct ContentView: View {
+              var body: some View {
+                  Text("Hello")
+              }
+          }
+
+          @main
+          struct TestApp: App {
+              var body: some Scene {
+                  WindowGroup {
+                      ContentView()
+                  }
+              }
+          }
+          EOF
+          
+          cat > Info.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDisplayName</key>
+              <string>TestApp</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.test.app</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build minimal
+        run: |
+          xcodebuild build \
+            -project <(echo "minimal") \
+            2>&1 | head -20 || true
+          
+          echo "=== Using single file build ==="
+          # Try compiling single file
+          xcrun swiftc -target arm64-apple-ios16.0-simulator -sdk $(xcrun --sdk iphonesimulator --show-sdk-path) TestApp/ContentView.swift 2>&1 | head -30 || echo "SWIFTC FAILED"
