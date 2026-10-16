@@ -22,6 +22,13 @@ jobs:
       - name: Generate Xcode project
         run: python3 generate_project.py
 
+      - name: Verify Project
+        run: |
+          echo "=== Project list ==="
+          xcodebuild -list -project AdminDashboard.xcodeproj 2>&1 | head -30 || echo "LIST FAILED"
+          echo "=== Build settings ==="
+          xcodebuild -project AdminDashboard.xcodeproj -scheme AdminDashboard -showBuildSettings 2>&1 | head -50 || echo "SHOWBUILDSETTINGS FAILED"
+
       - name: Build
         run: |
           echo "=== Building with xcodebuild ==="
