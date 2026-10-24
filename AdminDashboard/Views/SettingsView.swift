@@ -123,7 +123,7 @@ extension View {
     }
 }
 
-private struct SwitchRow: View {
+struct SwitchRow: View {
     let label: String
     @Binding var checked: Bool
     var body: some View {
@@ -351,7 +351,7 @@ private struct PointsSettingsTab: View {
                 FieldWithHint(label: "点数兑换比例", hint: "1元等于多少点数", text: $rate)
                 FieldWithHint(label: "邀请人奖励点数", hint: "每成功邀请一位新用户，邀请人获得的点数", keyboard: .numberPad, text: $inviteInviter)
                 FieldWithHint(label: "新用户奖励点数", hint: "通过邀请链接注册的新用户额外获得的点数", keyboard: .numberPad, text: $inviteNewuser)
-                FieldWithHint(label: "邀请落地页链接", hint: "邀请活动的落地页地址", text: $inviteLandingUrl, keyboard: .URL)
+                FieldWithHint(label: "邀请落地页链接", hint: "邀请活动的落地页地址", keyboard: .URL, text: $inviteLandingUrl)
                 Button("保存点数设置") {
                     Task {
                         do {
@@ -758,7 +758,7 @@ private struct AppUpdateTab: View {
                 SwitchRow(label: "启用更新检查", checked: $enabled)
                 FieldWithHint(label: "版本号(version code)", hint: "整数，客户端版本号大于此值时提示更新", keyboard: .numberPad, text: $versionCode)
                 FieldWithHint(label: "版本名称(version name)", hint: "展示用版本名，如 1.2.0", text: $versionName)
-                FieldWithHint(label: "下载链接", hint: "安装包/APK 下载地址", text: $downloadUrl, keyboard: .URL)
+                FieldWithHint(label: "下载链接", hint: "安装包/APK 下载地址", keyboard: .URL, text: $downloadUrl)
                 FieldWithHint(label: "更新日志", hint: "本次更新内容说明", text: $updateLog)
                 SwitchRow(label: "强制更新（不更新不可用）", checked: $force)
                 Button("保存\(title)") {
