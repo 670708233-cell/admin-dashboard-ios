@@ -115,11 +115,15 @@ struct DashboardData: Decodable {
     let miniProgramTodayRegistrations: Int?
     let miniProgramTotalUsers: Int?
     let miniProgramTodayAdViews: Int?
+    let miniProgramTodayAiAnalysis: Int?
     let miniProgramTodayAiWorkAnalysis: Int?
     let miniProgramTodayAiWeightAnalysis: Int?
+    let miniProgramTodayRecharge: Double?
+    let miniProgramTotalRecharge: Double?
     let alipayTodayRegistrations: Int?
     let alipayTotalUsers: Int?
     let alipayTodayAdViews: Int?
+    let alipayTodayAiAnalysis: Int?
     let alipayTodayAiWorkAnalysis: Int?
     let alipayTodayAiWeightAnalysis: Int?
     let userGrowth: [GrowthPoint]?
@@ -129,6 +133,8 @@ struct DashboardData: Decodable {
     let webRequests: WebRequestStat?
     let miniProgramRequests: MiniRequestStat?
     let alipayRequests: MiniRequestStat?
+    let androidRequests: WebRequestStat?
+    let iosRequests: WebRequestStat?
     let totalCookies: Int?
     let validCookies: Int?
     let invalidCookies: Int?
@@ -162,6 +168,7 @@ struct WebUser: Decodable, Identifiable {
     let registerIp: String?
     let registerLocation: String?
     let isSuperVip: Int?
+    let superVipDailyLimit: Int?
     let todayQueryCount: Int?
     let vipInfo: WebVipInfo?
 
@@ -171,6 +178,7 @@ struct WebUser: Decodable, Identifiable {
         case registerIp = "register_ip"
         case registerLocation = "register_location"
         case isSuperVip = "is_super_vip"
+        case superVipDailyLimit = "super_vip_daily_limit"
         case todayQueryCount = "today_query_count"
         case vipInfo = "vip_info"
     }
@@ -182,14 +190,21 @@ struct WebUser: Decodable, Identifiable {
     }
 }
 
+/// 设置VIP：完整表单（对齐 Vue setSuperVipForm）
 struct SetVipReq: Encodable {
     let userId: Int
     let isSuperVip: Int
     let vipType: String
+    var dailyLimit: Int?
+    var startDate: String?
+    var endDate: String?
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case isSuperVip = "is_super_vip"
         case vipType = "vip_type"
+        case dailyLimit = "daily_limit"
+        case startDate = "start_date"
+        case endDate = "end_date"
     }
 }
 
@@ -329,12 +344,14 @@ struct MiniSetVipReq: Encodable {
     let packageId: Int?
     let startDate: String?
     let endDate: String?
+    var orderNo: String?
     enum CodingKeys: String, CodingKey {
         case userId = "user_id"
         case isVip = "is_vip"
         case packageId = "package_id"
         case startDate = "start_date"
         case endDate = "end_date"
+        case orderNo = "order_no"
     }
 }
 
@@ -503,16 +520,22 @@ struct SettingUpdateReq: Encodable {
     let settingKey: String?
     let settingValue: String?
     let description: String?
+    var status: Int?      // web 端 flow_card_ad 用（总开关）
     enum CodingKeys: String, CodingKey {
-        case id
+        case id, description, status
         case settingKey = "setting_key"
         case settingValue = "setting_value"
-        case description
     }
 }
 
+/// 删除设置：mini/alipay 传 setting_key；web 传 id + setting_key
 struct SettingDeleteReq: Encodable {
-    let id: Int
+    var id: Int?
+    var settingKey: String?
+    enum CodingKeys: String, CodingKey {
+        case id
+        case settingKey = "setting_key"
+    }
 }
 
 // MARK: - 操作日志（对齐后端 admin.Log 真实字段）

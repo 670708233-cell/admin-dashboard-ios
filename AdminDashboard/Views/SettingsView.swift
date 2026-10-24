@@ -4,7 +4,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @State private var tab = 0
-    private let tabs = ["基础设置", "微信小程序", "支付宝小程序", "用户设置", "点数设置", "接口限流"]
+    private let tabs = ["基础设置", "微信小程序", "支付宝小程序", "Web端设置", "用户设置", "点数设置", "接口限流", "安卓更新", "iOS更新"]
     @State private var settings: [String: Any?]?
     @State private var error: String?
 
@@ -54,13 +54,22 @@ struct SettingsView: View {
         case 0: BasicSettingsTab(settings: map)
         case 1: KeyValueSection(load: { try await APIClient.shared.miniProgramSettings() },
                                 save: { try await APIClient.shared.miniProgramUpdateSetting($0) },
-                                delete: { try await APIClient.shared.miniProgramDeleteSetting($0) })
+                                delete: { try await APIClient.shared.miniProgramDeleteSetting($0) },
+                                announcementEnabled: true)
         case 2: KeyValueSection(load: { try await APIClient.shared.alipaySettings() },
                                 save: { try await APIClient.shared.alipayUpdateSetting($0) },
-                                delete: { try await APIClient.shared.alipayDeleteSetting($0) })
-        case 3: UserSettingsTab(settings: map)
-        case 4: PointsSettingsTab(settings: map)
-        default: RateLimitTab(settings: map)
+                                delete: { try await APIClient.shared.alipayDeleteSetting($0) },
+                                announcementEnabled: true)
+        case 3: KeyValueSection(load: { try await APIClient.shared.webSettings() },
+                                save: { try await APIClient.shared.webUpdateSetting($0) },
+                                delete: { try await APIClient.shared.webDeleteSetting($0) },
+                                announcementEnabled: true,
+                                flowCardAdEnabled: true)
+        case 4: UserSettingsTab(settings: map)
+        case 5: PointsSettingsTab(settings: map)
+        case 6: RateLimitTab(settings: map)
+        case 7: AppUpdateTab(settings: map, prefix: "app_update", title: "安卓端更新设置")
+        default: AppUpdateTab(settings: map, prefix: "ios_app_update", title: "iOS端更新设置")
         }
     }
 }
@@ -319,6 +328,9 @@ private struct PointsSettingsTab: View {
     @State private var bonus = ""
     @State private var signPoints = ""
     @State private var rate = ""
+    @State private var inviteInviter = ""
+    @State private var inviteNewuser = ""
+    @State private var inviteLandingUrl = ""
     @State private var toast: String?
 
     init(settings: [String: Any?]) {
@@ -326,6 +338,9 @@ private struct PointsSettingsTab: View {
         _bonus = State(initialValue: String(settings.settingInt("new_user_bonus", 30)))
         _signPoints = State(initialValue: String(settings.settingInt("daily_sign_points", 10)))
         _rate = State(initialValue: settings.settingStr("points_exchange_rate").ifBlank("100"))
+        _inviteInviter = State(initialValue: String(settings.settingInt("invite_reward_inviter", 0)))
+        _inviteNewuser = State(initialValue: String(settings.settingInt("invite_reward_newuser", 0)))
+        _inviteLandingUrl = State(initialValue: settings.settingStr("invite_landing_url"))
     }
 
     var body: some View {
@@ -334,13 +349,19 @@ private struct PointsSettingsTab: View {
                 FieldWithHint(label: "新用户注册赠送点数", keyboard: .numberPad, text: $bonus)
                 FieldWithHint(label: "每日签到奖励点数", keyboard: .numberPad, text: $signPoints)
                 FieldWithHint(label: "点数兑换比例", hint: "1元等于多少点数", text: $rate)
+                FieldWithHint(label: "邀请人奖励点数", hint: "每成功邀请一位新用户，邀请人获得的点数", keyboard: .numberPad, text: $inviteInviter)
+                FieldWithHint(label: "新用户奖励点数", hint: "通过邀请链接注册的新用户额外获得的点数", keyboard: .numberPad, text: $inviteNewuser)
+                FieldWithHint(label: "邀请落地页链接", hint: "邀请活动的落地页地址", text: $inviteLandingUrl, keyboard: .URL)
                 Button("保存点数设置") {
                     Task {
                         do {
                             try await APIClient.shared.settingsSave([
                                 "new_user_bonus": bonus,
                                 "daily_sign_points": signPoints,
-                                "points_exchange_rate": rate])
+                                "points_exchange_rate": rate,
+                                "invite_reward_inviter": inviteInviter,
+                                "invite_reward_newuser": inviteNewuser,
+                                "invite_landing_url": inviteLandingUrl])
                             toast = "点数设置保存成功"
                         } catch { toast = error.localizedDescription }
                     }
@@ -355,13 +376,14 @@ private struct PointsSettingsTab: View {
 
 // MARK: - Tab 6：接口限流设置
 
+// key 带 rate_limit_ 前缀（对齐 Vue/后端，2026-10-22 起旧无前缀 key 不再生效）
 private let rateLimitDefaults: [(String, Int)] = [
-    ("refresh_max", 80), ("refresh_window", 60),
-    ("batch_refresh_max", 3000), ("batch_refresh_window", 86400),
-    ("query_max", 1000), ("query_window", 86400),
-    ("weight_query_max", 100), ("weight_query_window", 86400),
-    ("public_query_max", 80), ("public_query_window", 60),
-    ("api_query_max", 3000), ("api_query_window", 86400)
+    ("rate_limit_refresh_max", 80), ("rate_limit_refresh_window", 60),
+    ("rate_limit_batch_refresh_max", 3000), ("rate_limit_batch_refresh_window", 86400),
+    ("rate_limit_query_max", 1000), ("rate_limit_query_window", 86400),
+    ("rate_limit_weight_query_max", 100), ("rate_limit_weight_query_window", 86400),
+    ("rate_limit_public_query_max", 80), ("rate_limit_public_query_window", 60),
+    ("rate_limit_api_query_max", 3000), ("rate_limit_api_query_window", 86400)
 ]
 
 private struct RateLimitTab: View {
@@ -370,12 +392,12 @@ private struct RateLimitTab: View {
     @State private var toast: String?
 
     private let groups: [(String, [(String, String)])] = [
-        ("单次数据刷新 refresh", [("refresh_max", "最大请求数（默认80）"), ("refresh_window", "时间窗口秒（默认60）")]),
-        ("批量数据刷新 batch_refresh", [("batch_refresh_max", "最大请求数（默认3000）"), ("batch_refresh_window", "时间窗口秒（默认86400）")]),
-        ("批量查询 query", [("query_max", "最大请求数（默认1000）"), ("query_window", "时间窗口秒（默认86400）")]),
-        ("权重查询 weight_query（仅非VIP）", [("weight_query_max", "最大请求数（默认100）"), ("weight_query_window", "时间窗口秒（默认86400）")]),
-        ("公开查询/API public_query", [("public_query_max", "最大请求数（默认80）"), ("public_query_window", "时间窗口秒（默认60）")]),
-        ("统计查询/API对接 api_query", [("api_query_max", "最大请求数（默认3000）"), ("api_query_window", "时间窗口秒（默认86400）")])
+        ("单次数据刷新 refresh", [("rate_limit_refresh_max", "最大请求数（默认80）"), ("rate_limit_refresh_window", "时间窗口秒（默认60）")]),
+        ("批量数据刷新 batch_refresh", [("rate_limit_batch_refresh_max", "最大请求数（默认3000）"), ("rate_limit_batch_refresh_window", "时间窗口秒（默认86400）")]),
+        ("批量查询 query", [("rate_limit_query_max", "最大请求数（默认1000）"), ("rate_limit_query_window", "时间窗口秒（默认86400）")]),
+        ("权重查询 weight_query（仅非VIP）", [("rate_limit_weight_query_max", "最大请求数（默认100）"), ("rate_limit_weight_query_window", "时间窗口秒（默认86400）")]),
+        ("公开查询/API public_query", [("rate_limit_public_query_max", "最大请求数（默认80）"), ("rate_limit_public_query_window", "时间窗口秒（默认60）")]),
+        ("统计查询/API对接 api_query", [("rate_limit_api_query_max", "最大请求数（默认3000）"), ("rate_limit_api_query_window", "时间窗口秒（默认86400）")])
     ]
 
     init(settings: [String: Any?]) {
@@ -439,6 +461,8 @@ struct KeyValueSection: View {
     let load: () async throws -> [KeyValueSetting]
     let save: (SettingUpdateReq) async throws -> Void
     let delete: (SettingDeleteReq) async throws -> Void
+    var announcementEnabled = false   // 公告配置（工作/休班时段+文案 JSON）特殊编辑
+    var flowCardAdEnabled = false     // 流量卡广告（status 开关 + title/image/link）特殊编辑
 
     @State private var items: [KeyValueSetting] = []
     @State private var loading = false
@@ -466,9 +490,19 @@ struct KeyValueSection: View {
                 ScrollView {
                     LazyVStack(spacing: 10) {
                         ForEach(items) { s in
-                            KeyValueRow(item: s,
-                                        onSave: { v in run { try await save(SettingUpdateReq(id: s.id, settingKey: s.settingKey, settingValue: v, description: s.description)) } },
-                                        onDelete: { run { try await delete(SettingDeleteReq(id: s.id ?? 0)) } })
+                            if announcementEnabled, s.settingKey == "announcement" {
+                                AnnouncementCard(item: s,
+                                                 onSave: { json in run { try await save(SettingUpdateReq(id: s.id, settingKey: s.settingKey, settingValue: json, description: s.description)) } },
+                                                 onDelete: { run { try await delete(SettingDeleteReq(id: s.id, settingKey: s.settingKey)) } })
+                            } else if flowCardAdEnabled, s.settingKey == "flow_card_ad" {
+                                FlowCardAdCard(item: s,
+                                               onSave: { value, status in run { try await save(SettingUpdateReq(id: s.id, settingKey: s.settingKey, settingValue: value, description: s.description, status: status)) } },
+                                               onDelete: { run { try await delete(SettingDeleteReq(id: s.id, settingKey: s.settingKey)) } })
+                            } else {
+                                KeyValueRow(item: s,
+                                            onSave: { v in run { try await save(SettingUpdateReq(id: s.id, settingKey: s.settingKey, settingValue: v, description: s.description)) } },
+                                            onDelete: { run { try await delete(SettingDeleteReq(id: s.id, settingKey: s.settingKey)) } })
+                            }
                         }
                     }
                     .padding(.horizontal, 16).padding(.bottom, 20)
@@ -563,5 +597,188 @@ struct KeyValueRow: View {
             }
         }
         .onAppear { value = item.settingValue ?? "" }
+    }
+}
+
+// MARK: - 公告配置（工作/休班时段+文案 → announcement JSON，对齐 Vue serializeAnnouncementJson）
+
+private struct AnnouncementCard: View {
+    let item: KeyValueSetting
+    var onSave: (String) -> Void
+    var onDelete: () -> Void
+
+    @State private var workMorningStart = "08:00"
+    @State private var workMorningEnd = "12:00"
+    @State private var workAfternoonStart = "14:00"
+    @State private var workAfternoonEnd = "18:00"
+    @State private var workText = ""
+    @State private var offText = ""
+    @State private var expanded = false
+
+    var body: some View {
+        GlassCard(accent: Tech.cyan, borderAlpha: 0.2, glowAlpha: 0.1) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("announcement（公告配置）").font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                        Text("按工作/休班时段自动切换前端公告").font(.system(size: 11)).foregroundColor(.white.opacity(0.4))
+                    }
+                    Spacer()
+                    Button(expanded ? "收起" : "编辑") { expanded.toggle() }
+                        .font(.system(size: 13)).foregroundColor(Tech.cyan)
+                    Button("保存") { saveJson() }
+                        .font(.system(size: 13)).foregroundColor(Tech.cyan)
+                    Button("删除") { onDelete() }
+                        .font(.system(size: 13)).foregroundColor(Tech.red)
+                }
+                if expanded {
+                    Text("工作时段（24小时制 HH:mm）").font(.system(size: 12)).foregroundColor(.white.opacity(0.5))
+                    HStack(spacing: 8) {
+                        LabeledField(label: "上午开始", text: $workMorningStart)
+                        LabeledField(label: "上午结束", text: $workMorningEnd)
+                    }
+                    HStack(spacing: 8) {
+                        LabeledField(label: "下午开始", text: $workAfternoonStart)
+                        LabeledField(label: "下午结束", text: $workAfternoonEnd)
+                    }
+                    LabeledField(label: "工作时段公告", text: $workText)
+                    LabeledField(label: "休班时段公告", text: $offText)
+                } else {
+                    Text(item.settingValue ?? "-")
+                        .font(.system(size: 12)).foregroundColor(.white.opacity(0.55)).lineLimit(2)
+                }
+            }
+        }
+        .onAppear { parseJson() }
+    }
+
+    private func parseJson() {
+        guard let data = (item.settingValue ?? "").data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        workMorningStart = obj["workMorningStart"] as? String ?? "08:00"
+        workMorningEnd = obj["workMorningEnd"] as? String ?? "12:00"
+        workAfternoonStart = obj["workAfternoonStart"] as? String ?? "14:00"
+        workAfternoonEnd = obj["workAfternoonEnd"] as? String ?? "18:00"
+        workText = obj["workAnnouncement"] as? String ?? ""
+        offText = obj["offWorkAnnouncement"] as? String ?? ""
+    }
+
+    private func saveJson() {
+        let obj: [String: String] = [
+            "workMorningStart": workMorningStart, "workMorningEnd": workMorningEnd,
+            "workAfternoonStart": workAfternoonStart, "workAfternoonEnd": workAfternoonEnd,
+            "workAnnouncement": workText, "offWorkAnnouncement": offText]
+        guard let data = try? JSONSerialization.data(withJSONObject: obj, options: []),
+              let json = String(data: data, encoding: .utf8) else { return }
+        onSave(json)
+    }
+}
+
+// MARK: - 流量卡广告（web 端 flow_card_ad：status 总开关 + value JSON{title,image,link}）
+
+private struct FlowCardAdCard: View {
+    let item: KeyValueSetting
+    var onSave: (String, Int) -> Void
+    var onDelete: () -> Void
+
+    @State private var enabled = false
+    @State private var title = ""
+    @State private var image = ""
+    @State private var link = ""
+
+    var body: some View {
+        GlassCard(accent: Tech.cyan, borderAlpha: 0.2, glowAlpha: 0.1) {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("flow_card_ad（流量卡广告）").font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                        Text("Web 端流量卡推广位配置").font(.system(size: 11)).foregroundColor(.white.opacity(0.4))
+                    }
+                    Spacer()
+                    Toggle("", isOn: $enabled).labelsHidden().tint(Tech.cyan).frame(width: 44)
+                    Button("保存") { saveJson() }
+                        .font(.system(size: 13)).foregroundColor(Tech.cyan)
+                    Button("删除") { onDelete() }
+                        .font(.system(size: 13)).foregroundColor(Tech.red)
+                }
+                LabeledField(label: "广告标题", text: $title)
+                LabeledField(label: "广告图片URL", text: $image)
+                LabeledField(label: "跳转链接", text: $link)
+            }
+        }
+        .onAppear { parseJson() }
+    }
+
+    private func parseJson() {
+        enabled = item.status == 1
+        guard let data = (item.settingValue ?? "").data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
+        title = obj["title"] as? String ?? ""
+        image = obj["image"] as? String ?? ""
+        link = obj["link"] as? String ?? ""
+    }
+
+    private func saveJson() {
+        let obj: [String: String] = ["title": title, "image": image, "link": link]
+        guard let data = try? JSONSerialization.data(withJSONObject: obj, options: []),
+              let json = String(data: data, encoding: .utf8) else { return }
+        onSave(json, enabled ? 1 : 0)
+    }
+}
+
+// MARK: - 安卓/iOS 端更新设置（app_update_* / ios_app_update_*，走统一 settings/save）
+
+private struct AppUpdateTab: View {
+    let settings: [String: Any?]
+    let prefix: String
+    let title: String
+    @State private var enabled = false
+    @State private var versionCode = ""
+    @State private var versionName = ""
+    @State private var downloadUrl = ""
+    @State private var updateLog = ""
+    @State private var force = false
+    @State private var toast: String?
+
+    init(settings: [String: Any?], prefix: String, title: String) {
+        self.settings = settings
+        self.prefix = prefix
+        self.title = title
+        _enabled = State(initialValue: settings.settingBool("\(prefix)_enabled", false))
+        _versionCode = State(initialValue: settings.settingStr("\(prefix)_version_code"))
+        _versionName = State(initialValue: settings.settingStr("\(prefix)_version_name"))
+        _downloadUrl = State(initialValue: settings.settingStr("\(prefix)_download_url"))
+        _updateLog = State(initialValue: settings.settingStr("\(prefix)_update_log"))
+        _force = State(initialValue: settings.settingBool("\(prefix)_force", false))
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                SwitchRow(label: "启用更新检查", checked: $enabled)
+                FieldWithHint(label: "版本号(version code)", hint: "整数，客户端版本号大于此值时提示更新", keyboard: .numberPad, text: $versionCode)
+                FieldWithHint(label: "版本名称(version name)", hint: "展示用版本名，如 1.2.0", text: $versionName)
+                FieldWithHint(label: "下载链接", hint: "安装包/APK 下载地址", text: $downloadUrl, keyboard: .URL)
+                FieldWithHint(label: "更新日志", hint: "本次更新内容说明", text: $updateLog)
+                SwitchRow(label: "强制更新（不更新不可用）", checked: $force)
+                Button("保存\(title)") {
+                    Task {
+                        do {
+                            try await APIClient.shared.settingsSave([
+                                "\(prefix)_enabled": enabled ? "1" : "0",
+                                "\(prefix)_version_code": versionCode,
+                                "\(prefix)_version_name": versionName,
+                                "\(prefix)_download_url": downloadUrl,
+                                "\(prefix)_update_log": updateLog,
+                                "\(prefix)_force": force ? "1" : "0"])
+                            toast = "\(title)保存成功"
+                        } catch { toast = error.localizedDescription }
+                    }
+                }
+                .buttonStyle(TechButtonStyle()).padding(.top, 6)
+            }
+            .padding(16)
+        }
+        .toastOverlay(toast)
     }
 }

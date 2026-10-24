@@ -205,6 +205,14 @@ final class APIClient {
     func alipayUpdateSetting(_ req: SettingUpdateReq) async throws { let _: PlainResp = try await perform("admin/alipay_settings/updateSetting", method: "POST", body: req) }
     func alipayDeleteSetting(_ req: SettingDeleteReq) async throws { let _: PlainResp = try await perform("admin/alipay_settings/deleteSetting", method: "POST", body: req) }
 
+    // MARK: - Web 端设置（公告/流量卡广告等 web 专属 KV）
+
+    func webSettings() async throws -> [KeyValueSetting] {
+        try await unwrap("admin/web_settings/getSettings")
+    }
+    func webUpdateSetting(_ req: SettingUpdateReq) async throws { let _: PlainResp = try await perform("admin/web_settings/updateSetting", method: "POST", body: req) }
+    func webDeleteSetting(_ req: SettingDeleteReq) async throws { let _: PlainResp = try await perform("admin/web_settings/deleteSetting", method: "POST", body: req) }
+
     // MARK: - 操作日志
 
     func logsList(page: Int = 1, pageSize: Int = 20, keyword: String? = nil, action: String? = nil) async throws -> PageData<OpLog> {

@@ -30,6 +30,7 @@ struct WebUsersView: View {
     @State private var input = ""
     @State private var toast: String?
     @State private var toastTask: Task<Void, Never>?
+    @State private var vipSheetTarget: WebUser?
 
     private let vipTypeOptions = [
         ("all", "全部用户"), ("vip", "VIP用户"), ("super_vip", "超级VIP"), ("normal_vip", "普通VIP")
@@ -52,8 +53,13 @@ struct WebUsersView: View {
                     ForEach(users) { u in
                         WebUserRow(user: u) { act in
                             actionTarget = u
-                            action = act
                             input = ""
+                            if act == .superVip {
+                                vipSheetTarget = u
+                                action = nil
+                            } else {
+                                action = act
+                            }
                         }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
@@ -69,16 +75,28 @@ struct WebUsersView: View {
         }
         .padding(16)
         .onAppear { load() }
-        // 确认类操作（超级VIP/关闭/删除）
+        // 超级VIP/设VIP完整表单（对齐 Vue setSuperVipForm）
+        .sheet(item: $vipSheetTarget) { u in
+            SuperVipSheet(user: u) { result in
+                vipSheetTarget = nil
+                Task {
+                    do {
+                        try await APIClient.shared.setSuperVip(SetVipReq(
+                            userId: result.userId, isSuperVip: result.isSuperVip,
+                            vipType: result.vipType, dailyLimit: result.dailyLimit,
+                            startDate: result.startDate, endDate: result.endDate))
+                        showToast("VIP设置成功")
+                        load()
+                    } catch {
+                        showToast(error.localizedDescription)
+                    }
+                }
+            }
+            .presentationDetents([.large])
+        }
+        // 确认类操作（关闭/删除）
         .alert(item: confirmAlertItem) { item in
             switch item {
-            case .superVip:
-                return Alert(
-                    title: Text("设为超级VIP"),
-                    message: Text("确认将 \(actionTarget?.username ?? "") 设为永久超级VIP？"),
-                    primaryButton: .default(Text("确认")) { runAction(.superVip) },
-                    secondaryButton: .cancel { action = nil }
-                )
             case .close:
                 return Alert(
                     title: Text("关闭VIP"),
@@ -184,7 +202,8 @@ struct WebUsersView: View {
             do {
                 switch type {
                 case .superVip:
-                    try await APIClient.shared.setSuperVip(SetVipReq(userId: id, isSuperVip: 1, vipType: "super"))
+                    // 已改走 SuperVipSheet 完整表单
+                    return
                 case .vipTime:
                     try await APIClient.shared.updateVipTime(UpdateVipTimeReq(userId: id, days: Int(input.trimmingCharacters(in: .whitespaces)), vipType: "normal"))
                 case .balance:
@@ -247,7 +266,7 @@ struct WebUserRow: View {
                     Text(user.username ?? "-")
                         .font(.system(size: 15, weight: .semibold))
                         .foregroundColor(.white)
-                    Text("余额: \(fmt(user.balance)) | \(user.vipLabel) | 今日查询: \(user.todayQueryCount ?? 0)")
+                    Text("余额: \(fmt(user.balance)) | \(user.vipLabel)\(superVipLimitSuffix) | 今日查询: \(user.todayQueryCount ?? 0)")
                         .font(.system(size: 12))
                         .foregroundColor(.white.opacity(0.7))
                     Text("注册: \(user.createdAt ?? "-")\(locationSuffix)")
@@ -279,6 +298,109 @@ struct WebUserRow: View {
     private var locationSuffix: String {
         if let loc = user.registerLocation, !loc.isEmpty, loc != "未知" { return " | \(loc)" }
         return ""
+    }
+
+    private var superVipLimitSuffix: String {
+        guard let limit = user.superVipDailyLimit, limit > 0, user.isSuperVip == 1 || user.vipInfo?.isSuperVip == 1 else { return "" }
+        return "(限额\(limit))"
+    }
+}
+
+// MARK: - 超级VIP/设VIP完整表单（对齐 Vue setSuperVipForm：vip_type/is_super_vip/daily_limit/start_date/end_date）
+
+struct SuperVipFormResult {
+    let userId: Int
+    let isSuperVip: Int
+    let vipType: String
+    var dailyLimit: Int?
+    var startDate: String?
+    var endDate: String?
+}
+
+struct SuperVipSheet: View {
+    let user: WebUser
+    var onConfirm: (SuperVipFormResult) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var vipType = "super"
+    @State private var enabled = true
+    @State private var dailyLimit = ""
+    @State private var startDate = Date()
+    @State private var endDate = Date().addingTimeInterval(30 * 86400)
+    @State private var hasStart = false
+    @State private var hasEnd = false
+
+    private static let display: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return f
+    }()
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("用户：\(user.username ?? "-")")
+                        .font(.system(size: 13)).foregroundColor(.white.opacity(0.6))
+
+                    HStack(spacing: 12) {
+                        pickerChip("super", "超级VIP")
+                        pickerChip("normal", "普通VIP")
+                    }
+
+                    SwitchRow(label: "启用VIP状态", checked: $enabled)
+
+                    LabeledField(label: "每日查询限额（留空=不限制）", text: $dailyLimit, keyboard: .numberPad)
+
+                    Toggle(hasStart ? "清除起始时间" : "设置起始时间", isOn: $hasStart).tint(Tech.cyan)
+                    if hasStart {
+                        DatePicker("开始时间", selection: $startDate)
+                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                    }
+                    Toggle(hasEnd ? "清除结束时间" : "设置结束时间", isOn: $hasEnd).tint(Tech.cyan)
+                    if hasEnd {
+                        DatePicker("结束时间", selection: $endDate)
+                            .environment(\.locale, Locale(identifier: "zh_CN"))
+                    }
+
+                    Button("确认设置") {
+                        var result = SuperVipFormResult(
+                            userId: user.id ?? 0,
+                            isSuperVip: enabled ? 1 : 0,
+                            vipType: vipType)
+                        if let n = Int(dailyLimit.trimmingCharacters(in: .whitespaces)), n > 0 {
+                            result.dailyLimit = n
+                        }
+                        result.startDate = hasStart ? Self.display.string(from: startDate) : nil
+                        result.endDate = hasEnd ? Self.display.string(from: endDate) : nil
+                        onConfirm(result)
+                    }
+                    .buttonStyle(TechButtonStyle()).padding(.top, 8)
+                }
+                .padding(20)
+            }
+            .background(Tech.bgBottom.ignoresSafeArea())
+            .navigationTitle("设置VIP")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") { dismiss() }.foregroundColor(Tech.cyan)
+                }
+            }
+        }
+    }
+
+    private func pickerChip(_ value: String, _ label: String) -> some View {
+        Button {
+            vipType = value
+        } label: {
+            Text(label)
+                .font(.system(size: 14, weight: vipType == value ? .semibold : .regular))
+                .foregroundColor(vipType == value ? .black : .white.opacity(0.75))
+                .padding(.horizontal, 16).padding(.vertical, 8)
+                .background(Capsule().fill(vipType == value ? AnyShapeStyle(Tech.accentGradient) : AnyShapeStyle(Color.white.opacity(0.08))))
+                .overlay(Capsule().strokeBorder(vipType == value ? Color.clear : Tech.cyan.opacity(0.25), lineWidth: 1))
+        }
     }
 }
 

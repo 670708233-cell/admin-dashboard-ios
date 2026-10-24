@@ -114,6 +114,9 @@ struct DashboardView: View {
                 StatCard(title: "今日看广告次数", value: fmt(d.miniProgramTodayAdViews), accent: Tech.accent(2))
                 StatCard(title: "AI作品优化分析", value: fmt(d.miniProgramTodayAiWorkAnalysis), accent: Tech.accent(4))
                 StatCard(title: "AI账号权重分析", value: fmt(d.miniProgramTodayAiWeightAnalysis), accent: Tech.accent(5))
+                StatCard(title: "AI分析总数", value: fmt(d.miniProgramTodayAiAnalysis), accent: Tech.accent(6))
+                StatCard(title: "今日充值", value: "￥\(fmt(d.miniProgramTodayRecharge))", accent: Tech.accent(1))
+                StatCard(title: "总充值", value: "￥\(fmt(d.miniProgramTotalRecharge))", accent: Tech.accent(3))
             }
         }
     }
@@ -128,6 +131,7 @@ struct DashboardView: View {
                 StatCard(title: "今日看广告次数", value: fmt(d.alipayTodayAdViews), accent: Tech.accent(2))
                 StatCard(title: "AI作品优化分析", value: fmt(d.alipayTodayAiWorkAnalysis), accent: Tech.accent(4))
                 StatCard(title: "AI账号权重分析", value: fmt(d.alipayTodayAiWeightAnalysis), accent: Tech.accent(5))
+                StatCard(title: "AI分析总数", value: fmt(d.alipayTodayAiAnalysis), accent: Tech.accent(6))
             }
         }
     }
@@ -158,6 +162,26 @@ struct DashboardView: View {
                 ApiStatCard(title: "权重", success: d.alipayRequests?.weight?.success, failed: d.alipayRequests?.weight?.failed, total: d.alipayRequests?.weight?.total)
                 ApiStatCard(title: "素材", success: d.alipayRequests?.material?.success, failed: d.alipayRequests?.material?.failed, total: d.alipayRequests?.material?.total)
                 ApiStatCard(title: "总计", success: d.alipayRequests?.total?.success, failed: d.alipayRequests?.total?.failed, total: d.alipayRequests?.total?.total)
+            }
+
+            SectionTitle(text: "安卓App API分类统计")
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+                ApiStatCard(title: "查询", success: d.androidRequests?.query?.success, failed: d.androidRequests?.query?.failed, total: d.androidRequests?.query?.total)
+                ApiStatCard(title: "刷新", success: d.androidRequests?.refresh?.success, failed: d.androidRequests?.refresh?.failed, total: d.androidRequests?.refresh?.total)
+                ApiStatCard(title: "权重", success: d.androidRequests?.weight?.success, failed: d.androidRequests?.weight?.failed, total: d.androidRequests?.weight?.total)
+                ApiStatCard(title: "公开查询", success: d.androidRequests?.publicQuery?.success, failed: d.androidRequests?.publicQuery?.failed, total: d.androidRequests?.publicQuery?.total)
+                ApiStatCard(title: "API查询", success: d.androidRequests?.apiQuery?.success, failed: d.androidRequests?.apiQuery?.failed, total: d.androidRequests?.apiQuery?.total)
+                ApiStatCard(title: "总计", success: d.androidRequests?.total?.success, failed: d.androidRequests?.total?.failed, total: d.androidRequests?.total?.total)
+            }
+
+            SectionTitle(text: "iOS App API分类统计")
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
+                ApiStatCard(title: "查询", success: d.iosRequests?.query?.success, failed: d.iosRequests?.query?.failed, total: d.iosRequests?.query?.total)
+                ApiStatCard(title: "刷新", success: d.iosRequests?.refresh?.success, failed: d.iosRequests?.refresh?.failed, total: d.iosRequests?.refresh?.total)
+                ApiStatCard(title: "权重", success: d.iosRequests?.weight?.success, failed: d.iosRequests?.weight?.failed, total: d.iosRequests?.weight?.total)
+                ApiStatCard(title: "公开查询", success: d.iosRequests?.publicQuery?.success, failed: d.iosRequests?.publicQuery?.failed, total: d.iosRequests?.publicQuery?.total)
+                ApiStatCard(title: "API查询", success: d.iosRequests?.apiQuery?.success, failed: d.iosRequests?.apiQuery?.failed, total: d.iosRequests?.apiQuery?.total)
+                ApiStatCard(title: "总计", success: d.iosRequests?.total?.success, failed: d.iosRequests?.total?.failed, total: d.iosRequests?.total?.total)
             }
 
             SectionTitle(text: "今日请求")
