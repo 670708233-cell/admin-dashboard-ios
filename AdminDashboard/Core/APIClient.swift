@@ -125,12 +125,13 @@ final class APIClient {
 
     // MARK: - 微信小程序用户
 
-    func miniUsers(page: Int = 1, pageSize: Int = 20, keyword: String? = nil, vipType: String? = nil) async throws -> PageData<MiniUser> {
+    func miniUsers(page: Int = 1, pageSize: Int = 20, keyword: String? = nil, vipType: String? = nil, hasQueryToday: Bool? = nil) async throws -> PageData<MiniUser> {
         try await unwrap("admin/mini/user/list", query: [
             .init(name: "page", value: "\(page)"),
             .init(name: "page_size", value: "\(pageSize)"),
             .init(name: "search", value: keyword),
-            .init(name: "vip_type", value: vipType)
+            .init(name: "vip_type", value: vipType),
+            .init(name: "has_query_today", value: hasQueryToday == true ? "1" : nil)
         ])
     }
 
@@ -144,12 +145,13 @@ final class APIClient {
 
     // MARK: - 支付宝小程序用户
 
-    func alipayUsers(page: Int = 1, pageSize: Int = 20, keyword: String? = nil, vipType: String? = nil) async throws -> PageData<AlipayUser> {
+    func alipayUsers(page: Int = 1, pageSize: Int = 20, keyword: String? = nil, vipType: String? = nil, hasQueryToday: Bool? = nil) async throws -> PageData<AlipayUser> {
         try await unwrap("admin/alipay/user/list", query: [
             .init(name: "page", value: "\(page)"),
             .init(name: "page_size", value: "\(pageSize)"),
             .init(name: "search", value: keyword),
-            .init(name: "vip_type", value: vipType)
+            .init(name: "vip_type", value: vipType),
+            .init(name: "has_query_today", value: hasQueryToday == true ? "1" : nil)
         ])
     }
 

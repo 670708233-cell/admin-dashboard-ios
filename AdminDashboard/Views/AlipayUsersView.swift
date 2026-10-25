@@ -7,6 +7,7 @@ struct AlipayUsersView: View {
     @State private var page = 1
     @State private var keyword = ""
     @State private var vipType = "all"
+    @State private var hasQueryToday = false
     @State private var loading = false
     @State private var error: String?
     @State private var vipTarget: AlipayUser?
@@ -15,6 +16,7 @@ struct AlipayUsersView: View {
     @State private var toastTask: Task<Void, Never>?
 
     private let vipTypeOptions = [("all", "全部用户"), ("vip", "VIP用户"), ("normal", "普通用户")]
+    private let queryOptions = [("0", "全部用户"), ("1", "今日有查询")]
     private var totalPages: Int { max(1, (total + 19) / 20) }
 
     var body: some View {
@@ -100,6 +102,9 @@ struct AlipayUsersView: View {
             FilterDropdown(label: "用户类型", selected: vipType, options: vipTypeOptions) {
                 vipType = $0; page = 1; load()
             }
+            FilterDropdown(label: "今日查询", selected: hasQueryToday ? "1" : "0", options: queryOptions) {
+                hasQueryToday = $0 == "1"; page = 1; load()
+            }
             Spacer()
         }
     }
@@ -139,7 +144,8 @@ struct AlipayUsersView: View {
             do {
                 let r = try await APIClient.shared.alipayUsers(
                     page: page, keyword: keyword.isEmpty ? nil : keyword,
-                    vipType: vipType == "all" ? nil : vipType
+                    vipType: vipType == "all" ? nil : vipType,
+                    hasQueryToday: hasQueryToday ? true : nil
                 )
                 users = r.rows
                 total = r.totalCount
