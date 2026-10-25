@@ -301,8 +301,16 @@ struct MiniUser: Decodable, Identifiable {
         case vipInfo = "vip_info"
     }
 
-    // 后端 mini 表 user_id 是 BIGINT,JSON 里以 number 输出;安卓 Gson 宽松转换无感,
-    // Swift JSONDecoder 严格类型会 typeMismatch(表现为"数据解析失败(200)")——手动兼容 int/str 双形态。
+    var vipLabel: String {
+        if vipInfo?.isVip == true { return "VIP至\(vipInfo?.endTime ?? vipExpireTime ?? "-")" }
+        return "普通用户"
+    }
+}
+
+// 后端 mini 表 user_id 是 BIGINT,JSON 里以 number 输出;安卓 Gson 宽松转换无感,
+// Swift JSONDecoder 严格类型会 typeMismatch(表现为"数据解析失败(200)")——手动兼容 int/str 双形态。
+// 放 extension 以免抑制 struct 的合成 memberwise init(MiniVipSheet 占位构造要用)。
+extension MiniUser {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decodeIfPresent(Int.self, forKey: .id)
@@ -321,11 +329,6 @@ struct MiniUser: Decodable, Identifiable {
         lastLoginAt = try c.decodeIfPresent(String.self, forKey: .lastLoginAt)
         todayQueryCount = try c.decodeIfPresent(Int.self, forKey: .todayQueryCount)
         vipInfo = try c.decodeIfPresent(MiniVipInfo.self, forKey: .vipInfo)
-    }
-
-    var vipLabel: String {
-        if vipInfo?.isVip == true { return "VIP至\(vipInfo?.endTime ?? vipExpireTime ?? "-")" }
-        return "普通用户"
     }
 }
 
