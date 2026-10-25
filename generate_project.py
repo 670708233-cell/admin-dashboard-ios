@@ -324,7 +324,7 @@ def build_config(config_id, name, is_target, is_debug):
         lines.append("\t\t\t\tGENERATE_INFOPLIST_FILE = NO;")
         lines.append("\t\t\t\tINFOPLIST_FILE = AdminDashboard/Info.plist;")
         lines.append("\t\t\t\tLD_RUNPATH_SEARCH_PATHS = (\"$(inherited)\", \"@executable_path/Frameworks\", );")
-        lines.append("\t\t\t\tMARKETING_VERSION = 1.0;")
+        lines.append("\t\t\t\tMARKETING_VERSION = 1.1.0;")
         lines.append("\t\t\t\tPRODUCT_BUNDLE_IDENTIFIER = com.doushujun.admin;")
         lines.append("\t\t\t\tPRODUCT_NAME = \"$(TARGET_NAME)\";")
         lines.append("\t\t\t\tSWIFT_VERSION = 5.0;")
