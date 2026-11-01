@@ -249,6 +249,39 @@ final class APIClient {
     func aiKeySaveConfig(_ req: AiKeySaveConfigReq) async throws { let _: PlainResp = try await perform("admin/ai_keys/save_config", method: "POST", body: req) }
     func aiKeyDelete(_ req: AiKeyDeleteReq) async throws { let _: PlainResp = try await perform("admin/ai_keys/delete", method: "POST", body: req) }
     func aiKeyTest(_ req: AiKeyTestReq) async throws { let _: PlainResp = try await perform("admin/ai_keys/test", method: "POST", body: req) }
+
+    // MARK: - 客户端数据看板
+
+    func clientStats(startDate: String?, endDate: String?, platform: String?) async throws -> ClientStatsData {
+        try await unwrap("admin/client_stats", query: [
+            .init(name: "start_date", value: startDate),
+            .init(name: "end_date", value: endDate),
+            .init(name: "platform", value: platform)
+        ])
+    }
+
+    // MARK: - 充值明细
+
+    func rechargeList(page: Int = 1, pageSize: Int = 20, platform: String? = nil, startDate: String? = nil, endDate: String? = nil, search: String? = nil) async throws -> RechargePage {
+        try await unwrap("admin/recharge/list", query: [
+            .init(name: "page", value: "\(page)"),
+            .init(name: "page_size", value: "\(pageSize)"),
+            .init(name: "platform", value: platform),
+            .init(name: "start_date", value: startDate),
+            .init(name: "end_date", value: endDate),
+            .init(name: "search", value: search)
+        ])
+    }
+
+    // MARK: - 多端在线会话
+
+    func userSessions(userId: Int) async throws -> UserSessionsData {
+        try await unwrap("admin/users/sessions", query: [.init(name: "user_id", value: "\(userId)")])
+    }
+
+    func setMultiLogin(_ req: SetMultiLoginReq) async throws { let _: PlainResp = try await perform("admin/users/set_multi_login", method: "POST", body: req) }
+
+    func kickSession(_ req: KickSessionReq) async throws { let _: PlainResp = try await perform("admin/users/kick_session", method: "POST", body: req) }
 }
 
 /// settingsGet 的任意值容器

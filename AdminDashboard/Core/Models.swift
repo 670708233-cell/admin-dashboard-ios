@@ -165,6 +165,7 @@ struct WebUser: Decodable, Identifiable {
     let email: String?
     let balance: Double?
     let createdAt: String?
+    let updatedAt: String?
     let registerIp: String?
     let registerLocation: String?
     let isSuperVip: Int?
@@ -175,6 +176,7 @@ struct WebUser: Decodable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, username, email, balance
         case createdAt = "created_at"
+        case updatedAt = "updated_at"
         case registerIp = "register_ip"
         case registerLocation = "register_location"
         case isSuperVip = "is_super_vip"
@@ -701,4 +703,154 @@ struct AiKeyDeleteReq: Encodable {
 
 struct AiKeyTestReq: Encodable {
     let id: Int
+}
+
+// MARK: - 客户端数据看板（对齐后端 admin/ClientStats.php）
+
+struct ClientStatsData: Decodable {
+    let summary: CSGroup?
+    let active: CSActive?
+    let trend: [CSTrendPoint]?
+    let platform: CSPlatform?
+}
+
+struct CSGroup: Decodable {
+    let download: CSNum?
+    let install: CSNum?
+    let register: CSNum?
+}
+
+struct CSNum: Decodable {
+    let today: Int?
+    let range: Int?
+    let total: Int?
+}
+
+struct CSActive: Decodable {
+    let dau: Int?
+    let week: Int?
+    let month: Int?
+}
+
+struct CSTrendPoint: Decodable {
+    let date: String?
+    let download: Int?
+    let install: Int?
+    let register: Int?
+}
+
+struct CSPlatform: Decodable {
+    let download: [CSPlatformRow]?
+    let install: [CSPlatformRow]?
+    let register: [CSPlatformRow]?
+}
+
+struct CSPlatformRow: Decodable {
+    let platform: String?
+    let count: Int?
+}
+
+// MARK: - 充值明细（对齐后端 admin/RechargeDetail.php）
+
+struct RechargePage: Decodable {
+    let records: [RechargeRecord]?
+    let total: Int?
+    let summary: RechargeSummary?
+}
+
+struct RechargeSummary: Decodable {
+    let count: Int?
+    let totalAmount: Double?
+    enum CodingKeys: String, CodingKey {
+        case count
+        case totalAmount = "total_amount"
+    }
+}
+
+struct RechargeRecord: Decodable, Identifiable {
+    let platform: String?
+    let orderId: Int?
+    let payTime: String?
+    let price: Double?
+    let packageName: String?
+    let orderNo: String?
+    let userName: String?
+    let userId: String?
+
+    var id: String { "\(orderId ?? 0)-\(platform ?? "-")-\(orderNo ?? "-")" }
+
+    enum CodingKeys: String, CodingKey {
+        case platform
+        case orderId = "order_id"
+        case payTime = "pay_time"
+        case price
+        case packageName = "package_name"
+        case orderNo = "order_no"
+        case userName = "user_name"
+        case userId = "user_id"
+    }
+
+    // price/user_id 后端可能输出 number 或 DECIMAL/BIGINT 字符串，双兼容
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        platform = try c.decodeIfPresent(String.self, forKey: .platform)
+        orderId = try c.decodeIfPresent(Int.self, forKey: .orderId)
+        payTime = try c.decodeIfPresent(String.self, forKey: .payTime)
+        if let d = try? c.decode(Double.self, forKey: .price) {
+            price = d
+        } else if let s = try? c.decode(String.self, forKey: .price), let d = Double(s) {
+            price = d
+        } else {
+            price = nil
+        }
+        packageName = try c.decodeIfPresent(String.self, forKey: .packageName)
+        orderNo = try c.decodeIfPresent(String.self, forKey: .orderNo)
+        userName = try c.decodeIfPresent(String.self, forKey: .userName)
+        if let s = try? c.decode(String.self, forKey: .userId) {
+            userId = s
+        } else if let i = try? c.decode(Int64.self, forKey: .userId) {
+            userId = String(i)
+        } else {
+            userId = nil
+        }
+    }
+}
+
+// MARK: - 多端在线会话（对齐后端 admin/User.php sessions/set_multi_login/kick_session）
+
+struct UserSessionsData: Decodable {
+    let multiLoginLimit: Int?
+    let sessions: [UserSession]?
+    enum CodingKeys: String, CodingKey {
+        case sessions
+        case multiLoginLimit = "multi_login_limit"
+    }
+}
+
+struct UserSession: Decodable, Identifiable {
+    let id: Int
+    let platform: String?
+    let loginTime: String?
+    let loginIp: String?
+    enum CodingKeys: String, CodingKey {
+        case id, platform
+        case loginTime = "login_time"
+        case loginIp = "login_ip"
+    }
+}
+
+struct SetMultiLoginReq: Encodable {
+    let userId: Int
+    let limit: Int
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case limit
+    }
+}
+
+struct KickSessionReq: Encodable {
+    let sessionId: Int
+    enum CodingKeys: String, CodingKey {
+        case sessionId = "session_id"
+    }
 }

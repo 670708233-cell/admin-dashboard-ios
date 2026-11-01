@@ -9,6 +9,8 @@ enum Screen: String, CaseIterable {
     case settings = "系统设置"
     case logs = "操作日志"
     case aikey = "AI Key 管理"
+    case clientStats = "客户端数据"
+    case recharge = "充值明细"
 
     var icon: String {
         switch self {
@@ -20,6 +22,8 @@ enum Screen: String, CaseIterable {
         case .settings: return "gearshape"
         case .logs: return "list.bullet.rectangle"
         case .aikey: return "key.fill"
+        case .clientStats: return "chart.bar.xaxis"
+        case .recharge: return "yensign.circle"
         }
     }
 }
@@ -124,6 +128,8 @@ struct MainView: View {
         case .settings: SettingsView()
         case .logs: LogsView()
         case .aikey: AiKeysView()
+        case .clientStats: ClientStatsView()
+        case .recharge: RechargeRecordsView()
         }
     }
 
