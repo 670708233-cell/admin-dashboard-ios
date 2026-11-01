@@ -83,7 +83,7 @@ struct ClientStatsView: View {
                         platform = "all"
                         fetch()
                     }
-                    .buttonStyle(TechButtonStyle(compact: true, enabled: false))
+                    .buttonStyle(TechButtonStyle(enabled: false, compact: true))
                     Spacer()
                 }
             }

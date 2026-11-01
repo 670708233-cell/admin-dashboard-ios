@@ -129,7 +129,7 @@ struct RechargeRecordsView: View {
                         platform = "all"; rangeKey = "0"; search = ""; pageNo = 1
                         fetch()
                     }
-                    .buttonStyle(TechButtonStyle(compact: true, enabled: false))
+                    .buttonStyle(TechButtonStyle(enabled: false, compact: true))
                 }
             }
         }
