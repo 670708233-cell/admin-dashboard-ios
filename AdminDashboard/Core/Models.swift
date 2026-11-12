@@ -854,3 +854,88 @@ struct KickSessionReq: Encodable {
         case sessionId = "session_id"
     }
 }
+
+// MARK: - 代理设置（2026-11-06 快代理动态IP/熔断直连/告警邮件，对齐后端 admin/DouyinProxySettings.php）
+
+/// GET admin/settings/douyin_proxy 返回：{config: 9个配置键值对, status: 运行状态快照}
+struct DouyinProxyData: Decodable {
+    let config: [String: String]?       // 配置键值对（douyin_proxy_mode/api_url/user/pass/port/static/ttl/alert_email/alert_on）
+    let status: DouyinProxyStatus?      // 运行状态快照
+}
+
+/// 运行状态快照（后端 DouyinProxy::getStatus）
+struct DouyinProxyStatus: Decodable {
+    let cachedIp: String?               // 当前缓存IP（TTL内生效，可能带端口）
+    let lastIp: String?                 // 24h备份IP（API拉取失败时兜底）
+    let failCnt: Int?                   // 连续失败计数（满3触发熔断）
+    let breaking: Bool?                 // 是否熔断直连中
+    let breakLeft: Int?                 // 熔断剩余秒数
+    let lastAlertTime: Int?             // 上次告警时间戳（秒）
+    let alerting: Bool?                 // 故障告警中（发过故障邮件未发恢复）
+    let lastUsed: String?               // 最近一次业务请求链路（"时间|描述"，排查直连/代理用）
+
+    enum CodingKeys: String, CodingKey {   // snake_case → 驼峰显式映射
+        case cachedIp = "cached_ip"
+        case lastIp = "last_ip"
+        case failCnt = "fail_cnt"
+        case breaking                    // JSON 键同名，隐式映射
+        case breakLeft = "break_left"
+        case lastAlertTime = "last_alert_time"
+        case alerting                    // JSON 键同名，隐式映射
+        case lastUsed = "last_used"
+    }
+}
+
+/// POST admin/settings/douyin_proxy/test 返回：链路测试结果
+struct DouyinProxyTestResult: Decodable {
+    let mode: String?                   // 当前模式（api）
+    let ip: String?                     // 快代理API返回的IP（可能带端口）
+    let proxyUrl: String?               // 拼装后的代理URL（账密已隐藏）
+    let ok: Bool?                       // 链路是否通畅
+    let echoIp: String?                 // 经代理访问回显接口看到的出口IP
+    let msg: String?                    // 失败原因（ok=false 时有值）
+
+    enum CodingKeys: String, CodingKey {   // snake_case → 驼峰显式映射
+        case mode, ip, ok, msg          // JSON 键同名，隐式映射
+        case proxyUrl = "proxy_url"
+        case echoIp = "echo_ip"
+    }
+}
+
+// MARK: - 取数引擎（2026-11-12 对齐后端 admin/DouyinDetailSettings.php：Web引擎体系 local/cdp_sign/cdp_proxy + 手机端接口 nosign/pure）
+
+/// GET admin/settings/douyin_detail 返回：{config: 7个dy_*键值对, effective_engine, effective_channel}
+struct DouyinDetailData: Decodable {
+    let config: [String: String]?       // 配置键值对（后端 (string) 强转，全字符串）
+    let effectiveEngine: String?        // 实际生效引擎（CDP 未配置地址时自动回落 local）
+    let effectiveChannel: String?       // 实际生效获取端（web / mobile）
+
+    enum CodingKeys: String, CodingKey {
+        case config
+        case effectiveEngine = "effective_engine"
+        case effectiveChannel = "effective_channel"
+    }
+}
+
+/// POST admin/settings/douyin_detail/test 与 /test_mobile 返回（两接口字段有交集，全可选）
+struct DouyinDetailTestResult: Decodable {
+    // test（CDP /health 透传）
+    let chromeReady: Bool?              // Chrome 是否就绪（false=首次调用会自动拉起，约6秒）
+    let stats: [String: AnyCodable]?    // 请求统计（键值对，如 tasks=3）
+    // test_mobile（真实拉一条固定视频）
+    let awemeId: String?                // 测试视频ID
+    let diggCount: Int?                 // 点赞数
+    let costMs: Int?                    // 耗时毫秒
+    let lastUsed: String?               // 实际请求链路
+    let ok: Bool?                       // 链路是否通畅
+    let msg: String?                    // 失败原因（后端 msg 在外层 code!=200 时由 API 层抛出，这里透传 data 内字段）
+
+    enum CodingKeys: String, CodingKey {
+        case stats, ok, msg
+        case chromeReady = "chrome_ready"
+        case awemeId = "aweme_id"
+        case diggCount = "digg_count"
+        case costMs = "cost_ms"
+        case lastUsed = "last_used"
+    }
+}

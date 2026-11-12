@@ -4,7 +4,9 @@ import SwiftUI
 
 struct SettingsView: View {
     @State private var tab = 0
-    private let tabs = ["基础设置", "微信小程序", "支付宝小程序", "Web端设置", "用户设置", "点数设置", "接口限流", "安卓更新", "iOS更新"]
+    // 2026-11-06 对齐 Vue 端更新：新增「代理设置」（快代理动态IP/熔断直连/告警邮件）
+    // 2026-11-12 对齐 Vue 端更新：新增「取数引擎」（Web引擎体系/手机端接口）
+    private let tabs = ["基础设置", "微信小程序", "支付宝小程序", "Web端设置", "用户设置", "点数设置", "接口限流", "安卓更新", "iOS更新", "代理设置", "取数引擎"]
     @State private var settings: [String: Any?]?
     @State private var error: String?
 
@@ -69,6 +71,9 @@ struct SettingsView: View {
         case 5: PointsSettingsTab(settings: map)
         case 6: RateLimitTab(settings: map)
         case 7: AppUpdateTab(settings: map, prefix: "app_update", title: "安卓端更新设置")
+        case 8: AppUpdateTab(settings: map, prefix: "ios_app_update", title: "iOS端更新设置")
+        case 9: ProxySettingsTab()                                             // 代理设置（独立接口加载，不依赖 settings map）
+        case 10: DouyinDetailEngineTab()                                       // 取数引擎（独立接口加载）
         default: AppUpdateTab(settings: map, prefix: "ios_app_update", title: "iOS端更新设置")
         }
     }
@@ -780,5 +785,497 @@ private struct AppUpdateTab: View {
             .padding(16)
         }
         .toastOverlay(toast)
+    }
+}
+
+// MARK: - Tab 10：代理设置（2026-11-06 快代理动态IP/熔断直连/告警邮件，对齐 Vue 端 SystemSettings.vue）
+// 对齐后端 admin/DouyinProxySettings.php（读/存/测/重置），独立接口加载不依赖 settings map
+
+private struct ProxySettingsTab: View {
+    // ── 加载态 ──
+    @State private var loading = true                    // 首次加载中
+    @State private var loadError: String?                // 加载失败文案（可重试）
+    // ── 表单字段（与后端 douyin_proxy_* 9键一一对应） ──
+    @State private var mode = "api"                      // 代理模式：off=直连 api=快代理API动态 static=静态代理
+    @State private var apiUrl = ""                       // 快代理提取IP的API链接（返回 纯IP 或 IP:端口）
+    @State private var user = ""                         // 代理认证账号
+    @State private var pass = ""                         // 代理认证密码
+    @State private var port = ""                         // 代理端口（API返回 IP:端口 时以API为准，此端口仅兜底）
+    @State private var staticProxy = ""                  // 静态代理地址（user:pass@ip:port）
+    @State private var ttl = "300"                       // IP缓存秒数（到期自动拉新IP）
+    @State private var alertEmail = ""                   // 故障告警收件邮箱
+    @State private var alertOn = true                    // 告警邮件开关
+    // ── 运行状态与操作态 ──
+    @State private var status: DouyinProxyStatus?        // 运行状态快照（后端 DouyinProxy::getStatus）
+    @State private var saving = false                    // 保存请求进行中
+    @State private var testing = false                   // 链路测试进行中
+    @State private var resetting = false                 // 重置熔断进行中
+    @State private var testResult: DouyinProxyTestResult? // 最近一次链路测试结果
+    @State private var toast: String?                    // 底部轻提示文案
+
+    var body: some View {
+        ScrollView {                                     // 整页可滚动
+            VStack(alignment: .leading, spacing: 12) {   // 纵向卡片流
+                if loading {                             // 首次加载态
+                    LoadingBox()
+                } else if let loadError {                // 加载失败态（点重试）
+                    ErrorBox(message: loadError) { load() }
+                } else {
+                    // ── 代理模式卡 ──
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("代理模式")                                  // 卡片标题
+                                .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                            Text("快代理API动态=默认走代理，故障自动熔断直连并发告警邮件；静态代理=固定地址；直连=不走代理")   // 模式说明
+                                .font(.system(size: 11)).foregroundColor(.white.opacity(0.5))
+                            HStack(spacing: 8) {                             // 模式三选一
+                                modeChip("直连", "off")                      // off
+                                modeChip("快代理API动态", "api")             // api
+                                modeChip("静态代理", "static")               // static
+                            }
+                        }
+                    }
+                    // ── 配置卡（直连模式无配置项） ──
+                    if mode != "off" {
+                        GlassCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                if mode == "api" {                           // 快代理 API 动态专属字段
+                                    FieldWithHint(label: "API链接（提取IP）", hint: "返回 纯IP 或 IP:端口，带端口时以API为准", keyboard: .URL, text: $apiUrl)
+                                    LabeledField(label: "代理账号", text: $user)                        // 账号输入
+                                    LabeledField(label: "代理密码", text: $pass, secure: true)          // 密码掩码输入
+                                    FieldWithHint(label: "代理端口", hint: "API带端口时优先用API的，此端口仅兜底", keyboard: .numberPad, text: $port)
+                                    FieldWithHint(label: "IP缓存秒数", hint: "到期自动调API拉新IP，默认300", keyboard: .numberPad, text: $ttl)
+                                } else {                                     // 静态代理专属字段
+                                    FieldWithHint(label: "静态代理地址", hint: "格式 user:pass@ip:port 或 ip:port", text: $staticProxy)
+                                }
+                                FieldWithHint(label: "故障告警收件邮箱", hint: "熔断/恢复时自动发邮件提醒", keyboard: .emailAddress, text: $alertEmail)   // 告警邮箱
+                                SwitchRow(label: "故障/恢复自动发邮件提醒", checked: $alertOn)           // 告警开关行
+                            }
+                        }
+                    }
+                    // ── 操作按钮行：保存 / 测试链路 / 重置熔断 ──
+                    HStack(spacing: 10) {
+                        Button { save() } label: { Text(saving ? "保存中…" : "保存配置") }                        // 主操作
+                            .buttonStyle(TechButtonStyle(enabled: !saving))
+                        Button { test() } label: { Text(testing ? "测试中…" : "测试链路") }                      // 直连模式禁用
+                            .buttonStyle(TechButtonStyle(enabled: !testing && mode != "off"))
+                        Button { reset() } label: { Text(resetting ? "重置中…" : "重置熔断") }                   // 恢复用
+                            .buttonStyle(TechButtonStyle(enabled: !resetting))
+                    }
+                    // ── 测试结果卡（点过测试才显示） ──
+                    if let r = testResult {
+                        GlassCard(accent: r.ok == true ? Tech.green : Tech.red) {   // 边框随结果变色
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(r.ok == true ? "链路正常：代理出口IP \(r.echoIp ?? "-")" : "链路异常：\(r.msg ?? "未知错误")")   // 结论行
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(r.ok == true ? Tech.green : Tech.red)          // 绿=通 红=异常
+                                if mode == "api", let ip = r.ip, !ip.isEmpty {  // API 模式附带显示提取到的 IP
+                                    Text("快代理API返回：\(ip)")
+                                        .font(.system(size: 12)).foregroundColor(.white.opacity(0.6))
+                                }
+                            }
+                        }
+                    }
+                    // ── 运行状态卡（对齐 Vue 端运行状态网格） ──
+                    if let s = status {
+                        GlassCard {
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("运行状态")                                 // 卡片标题
+                                    .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                                statusRow("当前缓存IP", s.cachedIp ?? "")        // TTL 内生效的代理地址
+                                statusRow("备份IP（24h兜底）", s.lastIp ?? "")   // API 拉取失败时的兜底
+                                statusRow("连续失败计数", "\(s.failCnt ?? 0) / 3") // 满 3 触发熔断
+                                statusRow("熔断状态", s.breaking == true ? "熔断直连中（剩 \(s.breakLeft ?? 0) 秒）" : "正常")   // 熔断器状态
+                                statusRow("故障告警中", s.alerting == true ? "是（恢复后将发邮件）" : "否")   // 是否处于告警周期
+                                statusRow("上次告警时间", alertTimeText(s.lastAlertTime))    // 秒级时间戳转可读
+                                statusRow("最近请求链路", s.lastUsed ?? "")      // 排查业务实际走直连还是代理
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16)                                         // 页边距
+        }
+        .toastOverlay(toast)                                     // 底部轻提示悬浮层
+        .task { if loading { load() } }                          // 进入 Tab 自动加载一次
+    }
+
+    // 模式胶囊按钮（选中高亮渐变，对齐顶部标签条风格）
+    private func modeChip(_ title: String, _ value: String) -> some View {
+        Button { mode = value } label: {                         // 点击切换模式
+            Text(title)
+                .font(.system(size: 12, weight: mode == value ? .semibold : .regular))   // 选中加粗
+                .foregroundColor(mode == value ? .black : .white.opacity(0.75))          // 选中黑字（渐变底上）
+                .padding(.horizontal, 12).padding(.vertical, 7)
+                .background(Capsule().fill(mode == value ? AnyShapeStyle(Tech.accentGradient) : AnyShapeStyle(Color.white.opacity(0.08))))   // 选中渐变底
+                .overlay(Capsule().strokeBorder(mode == value ? Color.clear : Tech.cyan.opacity(0.25), lineWidth: 1))                        // 未选中描边
+        }
+    }
+
+    // 状态行辅助：左灰右亮两端对齐
+    private func statusRow(_ key: String, _ value: String) -> some View {
+        HStack {                                                 // 水平排布
+            Text(key).font(.system(size: 12)).foregroundColor(.white.opacity(0.55))   // 左侧键名（弱化）
+            Spacer()                                             // 弹性空隙
+            Text(value.isEmpty ? "-" : value).font(.system(size: 12)).foregroundColor(.white.opacity(0.9))   // 右侧值（空显示 -）
+        }
+    }
+
+    // 秒级时间戳 → yyyy-MM-dd HH:mm:ss
+    private func alertTimeText(_ ts: Int?) -> String {
+        guard let ts, ts > 0 else { return "-" }                 // 无告警记录显示 -
+        let f = DateFormatter()                                  // 格式化器
+        f.dateFormat = "yyyy-MM-dd HH:mm:ss"                     // 目标格式
+        return f.string(from: Date(timeIntervalSince1970: TimeInterval(ts)))   // 秒 → Date → 字符串
+    }
+
+    // 加载配置与运行状态
+    private func load() {
+        Task {
+            do {
+                let d = try await APIClient.shared.douyinProxyGet()   // GET 配置+状态
+                let c = d.config ?? [:]                               // 配置键值对（可能为空）
+                let m = c["douyin_proxy_mode"] ?? "api"               // 回填模式（默认 api）
+                mode = m.isEmpty ? "api" : m                          // 空值兜底为 api
+                apiUrl = c["douyin_proxy_api_url"] ?? ""              // 回填 API 链接
+                user = c["douyin_proxy_user"] ?? ""                   // 回填账号
+                pass = c["douyin_proxy_pass"] ?? ""                   // 回填密码
+                port = c["douyin_proxy_port"] ?? ""                   // 回填端口
+                staticProxy = c["douyin_proxy_static"] ?? ""          // 回填静态代理
+                let t = c["douyin_proxy_ttl"] ?? "300"                // 回填 TTL（默认 300）
+                ttl = t.isEmpty ? "300" : t                           // 空值兜底
+                alertEmail = c["douyin_proxy_alert_email"] ?? ""      // 回填告警邮箱
+                alertOn = (c["douyin_proxy_alert_on"] ?? "1") != "0"  // 回填写告警开关（"1"为开）
+                status = d.status                                     // 记录运行状态快照
+                loadError = nil                                       // 清除错误
+            } catch { loadError = error.localizedDescription }        // 失败记录错误（展示重试态）
+            loading = false                                          // 关闭加载态
+        }
+    }
+
+    // 保存配置：组装 9 键扁平 map（后端 saveConfig 白名单校验后 upsert 进 system_settings）
+    private func save() {
+        saving = true                                               // 打开保存中态
+        Task {
+            do {
+                try await APIClient.shared.douyinProxySave([
+                    "douyin_proxy_mode": mode,                       // 模式
+                    "douyin_proxy_api_url": apiUrl.trimmingCharacters(in: .whitespaces),        // API 链接
+                    "douyin_proxy_user": user.trimmingCharacters(in: .whitespaces),             // 账号
+                    "douyin_proxy_pass": pass,                       // 密码（不 trim，防误删字符）
+                    "douyin_proxy_port": port.trimmingCharacters(in: .whitespaces),             // 端口
+                    "douyin_proxy_static": staticProxy.trimmingCharacters(in: .whitespaces),    // 静态代理
+                    "douyin_proxy_ttl": ttl.trimmingCharacters(in: .whitespaces).isEmpty ? "300" : ttl.trimmingCharacters(in: .whitespaces),   // TTL（空则后端默认 300）
+                    "douyin_proxy_alert_email": alertEmail.trimmingCharacters(in: .whitespaces),// 告警邮箱
+                    "douyin_proxy_alert_on": alertOn ? "1" : "0"     // 告警开关（"1"开）
+                ])
+                toast = "代理配置保存成功"                             // 成功提示
+                load()                                              // 重载最新配置+状态
+            } catch { toast = error.localizedDescription }           // 失败提示
+            saving = false                                          // 关闭保存中态
+        }
+    }
+
+    // 测试链路：拉IP → 经代理访问回显接口 → 显示出口IP
+    private func test() {
+        testing = true                                              // 打开测试中态
+        testResult = nil                                            // 清掉上次结果
+        Task {
+            do { testResult = try await APIClient.shared.douyinProxyTest() }   // 记录结果供 UI 展示
+            catch { toast = error.localizedDescription }            // 失败提示
+            testing = false                                         // 关闭测试中态
+        }
+    }
+
+    // 重置熔断：清失败计数/熔断标记/IP缓存（改完配置后点一下，立刻生效）
+    private func reset() {
+        resetting = true                                            // 打开重置中态
+        Task {
+            do {
+                try await APIClient.shared.douyinProxyReset()       // POST 重置
+                toast = "已重置熔断与缓存"                            // 成功提示
+                load()                                              // 重载状态
+            } catch { toast = error.localizedDescription }           // 失败提示
+            resetting = false                                       // 关闭重置中态
+        }
+    }
+}
+
+// MARK: - Tab 11：取数引擎（2026-11-12 对齐 Vue 端 douyinDetail 标签页）
+
+private struct DouyinDetailEngineTab: View {
+    // ── 加载态 ──
+    @State private var loading = true                    // 首次加载中
+    @State private var loadError: String?                // 加载失败文案（可重试）
+    // ── 表单字段（与后端 dy_* 7键一一对应） ──
+    @State private var channel = "web"                   // 获取端：web=Web端引擎体系 mobile=手机端接口
+    @State private var mobileFallback = true             // 手机端失败自动降级 Web 端体系：1/0
+    @State private var signMode = "nosign"               // 手机端签名模式：nosign=无签放行 pure=纯算六头
+    @State private var engine = "local"                  // 引擎模式：local=本地纯算 cdp_sign=CDP仅取签 cdp_proxy=CDP全代理
+    @State private var cdpBase = ""                      // CDP API 地址（DouyinDetailService.exe 监听地址）
+    @State private var cdpTimeout = "60"                 // CDP API 超时秒（建议 30~60）
+    @State private var cdpFallback = true                // CDP 失败自动降级本地纯算：1/0
+    // ── 实际生效（后端计算，CDP 地址缺失时自动回落 local，与所选可能不同） ──
+    @State private var effectiveEngine = "local"
+    @State private var effectiveChannel = "web"
+    // ── 操作态 ──
+    @State private var saving = false                    // 保存请求进行中
+    @State private var testing = false                   // 测试请求进行中
+    @State private var testResult: (ok: Bool, title: String, detail: String)?   // 测试结果（对齐 Vue {ok,title,detail}）
+    @State private var toast: String?                    // 底部轻提示文案
+
+    // 选项表（文案与 Vue dyChannelOptions/dySignModeOptions/dyEngineOptions 逐字一致）
+    private let channelOptions: [(value: String, label: String, desc: String)] = [
+        ("web", "Web端引擎体系（默认）", "douyin.com web 接口，走下方引擎模式（本地纯算 / CDP 取签 / CDP 全代理）"),
+        ("mobile", "手机端接口", "出口由「代理设置」控制，失败可降级 Web 端"),
+    ]
+    private let signOptions: [(value: String, label: String, desc: String)] = [
+        ("nosign", "无签模式（默认）", "不带任何签名头直取 aggr6 接口（服务端无签放行），最省资源"),
+        ("pure", "纯算签名", "gorgon/helios/medusa 真算 + ladon/argus 伪头（纯算六头）"),
+    ]
+    private let engineOptions: [(value: String, label: String, desc: String)] = [
+        ("local", "本地纯算（默认）", "Node 算 a_bogus + PHP 算 secsdk，代理可控，无需额外服务"),
+        ("cdp_sign", "CDP 仅取签（推荐）", "浏览器原生算签（抗风控最强），PHP 自己发请求保留代理/重试控制权，批量仍可 curl_multi 并行"),
+        ("cdp_proxy", "CDP 全代理", "浏览器签好并请求完直接拿最终响应，单条约 1.2 秒串行，数据最鲜活"),
+    ]
+
+    private var isCdp: Bool { engine == "cdp_sign" || engine == "cdp_proxy" }   // CDP 引擎（决定专属表单项显隐）
+    private var isMobile: Bool { channel == "mobile" }                          // 手机端获取通道
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                if loading {                             // 首次加载态
+                    LoadingBox()
+                } else if let loadError {                // 加载失败态（点重试）
+                    ErrorBox(message: loadError) { load() }
+                } else {
+                    // ── 获取端卡 ──
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("获取端")
+                                .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                            Text(desc(channelOptions, channel))
+                                .font(.system(size: 11)).foregroundColor(.white.opacity(0.5))
+                            VStack(spacing: 6) {                         // 两行选项（文案较长，竖排）
+                                ForEach(channelOptions, id: \.value) { opt in
+                                    optionRow(opt, selected: channel) { channel = $0 }
+                                }
+                            }
+                        }
+                    }
+                    // ── 手机端专属卡（失败降级 + 签名模式） ──
+                    if isMobile {
+                        GlassCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                SwitchRow(label: "失败降级Web端", checked: $mobileFallback)   // 降级开关
+                                Text("手机端取数失败时自动回退 Web 端引擎体系（业务不中断）")
+                                    .font(.system(size: 11)).foregroundColor(.white.opacity(0.5))
+                                Text("签名模式")
+                                    .font(.system(size: 14, weight: .semibold)).foregroundColor(.white.opacity(0.9))
+                                Text(desc(signOptions, signMode))
+                                    .font(.system(size: 11)).foregroundColor(.white.opacity(0.5))
+                                VStack(spacing: 6) {
+                                    ForEach(signOptions, id: \.value) { opt in
+                                        optionRow(opt, selected: signMode) { signMode = $0 }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // ── 引擎模式卡（Web 端引擎体系；手机端直取不走引擎，但 Vue 端恒显示，保持一致） ──
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("引擎模式")
+                                .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                            Text(desc(engineOptions, engine))
+                                .font(.system(size: 11)).foregroundColor(.white.opacity(0.5))
+                                .fixedSize(horizontal: false, vertical: true)
+                            VStack(spacing: 6) {
+                                ForEach(engineOptions, id: \.value) { opt in
+                                    optionRow(opt, selected: engine) { engine = $0 }
+                                }
+                            }
+                            if isCdp {                                   // CDP 引擎专属配置
+                                FieldWithHint(label: "CDP API 地址", hint: "DouyinDetailService.exe 的监听地址（含端口，不带末尾斜杠）", keyboard: .URL, text: $cdpBase)
+                                FieldWithHint(label: "API 超时(秒)", hint: "建议 30~60：Chrome 冷启动首次调用需 6 秒以上", keyboard: .numberPad, text: $cdpTimeout)
+                                SwitchRow(label: "失败降级本地", checked: $cdpFallback)      // CDP 挂掉自动回退本地纯算
+                                Text("CDP 取数失败时自动回退本地纯算（exe 挂掉不影响业务）")
+                                    .font(.system(size: 11)).foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                    }
+                    // ── 操作按钮行：保存 / 测试连接（CDP）/ 测试手机端通道（mobile） ──
+                    HStack(spacing: 10) {
+                        Button { save() } label: { Text(saving ? "保存中…" : "保存引擎设置") }
+                            .buttonStyle(TechButtonStyle(enabled: !saving))
+                        if isCdp {                                       // 仅 CDP 引擎显示
+                            Button { test(.cdp) } label: { Text(testing ? "测试中…" : "测试连接") }
+                                .buttonStyle(TechButtonStyle(enabled: !testing))
+                        }
+                        if isMobile {                                    // 仅手机端通道显示
+                            Button { test(.mobile) } label: { Text(testing ? "测试中…" : "测试手机端通道") }
+                                .buttonStyle(TechButtonStyle(enabled: !testing))
+                        }
+                    }
+                    // ── 测试结果卡（点过测试才显示） ──
+                    if let r = testResult {
+                        GlassCard(accent: r.ok ? Tech.green : Tech.red) {   // 边框随结果变色
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(r.title)
+                                    .font(.system(size: 14, weight: .semibold))
+                                    .foregroundColor(r.ok ? Tech.green : Tech.red)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                if !r.detail.isEmpty {                   // 附带统计/链路详情
+                                    Text(r.detail)
+                                        .font(.system(size: 12)).foregroundColor(.white.opacity(0.6))
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
+                        }
+                    }
+                    // ── 实际生效卡（后端实时计算：配置未保存/CDP 地址缺失时会与所选不同） ──
+                    GlassCard {
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("当前实际生效")
+                                .font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                            statusRow("获取端", effectiveChannel == "mobile" ? "手机端接口" : "Web端引擎体系")
+                            statusRow("引擎", engineLabel(effectiveEngine))
+                        }
+                    }
+                }
+            }
+            .padding(16)                                         // 页边距
+        }
+        .toastOverlay(toast)                                     // 底部轻提示悬浮层
+        .task { if loading { load() } }                          // 进入 Tab 自动加载一次
+    }
+
+    // 选项行：单选卡（选中青色描边+圆点，下方灰色描述，对齐 Vue radio+form-tip）
+    private func optionRow(_ opt: (value: String, label: String, desc: String),
+                           selected: String, onChange: @escaping (String) -> Void) -> some View {
+        let on = selected == opt.value                           // 是否选中
+        return Button { onChange(opt.value) } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Image(systemName: on ? "checkmark.circle.fill" : "circle")     // 选中实心圆点
+                        .font(.system(size: 13))
+                        .foregroundColor(on ? Tech.cyan : .white.opacity(0.35))
+                    Text(opt.label)
+                        .font(.system(size: 13, weight: on ? .semibold : .regular))
+                        .foregroundColor(on ? .white : .white.opacity(0.7))
+                }
+                Text(opt.desc)
+                    .font(.system(size: 10.5)).foregroundColor(.white.opacity(0.4))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 10).fill(on ? Tech.cyan.opacity(0.12) : Color.white.opacity(0.04)))
+            .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(on ? Tech.cyan.opacity(0.4) : Color.white.opacity(0.08), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // 状态行辅助：左灰右亮两端对齐（与 ProxySettingsTab 一致）
+    private func statusRow(_ key: String, _ value: String) -> some View {
+        HStack {
+            Text(key).font(.system(size: 12)).foregroundColor(.white.opacity(0.55))
+            Spacer()
+            Text(value.isEmpty ? "-" : value).font(.system(size: 12)).foregroundColor(.white.opacity(0.9))
+        }
+    }
+
+    // 选项描述查找：当前选中项的 desc（找不到回退空串）
+    private func desc(_ opts: [(value: String, label: String, desc: String)], _ value: String) -> String {
+        opts.first { $0.value == value }?.desc ?? ""
+    }
+
+    // 引擎 value → 展示文案（实际生效行用，未知值原样显示）
+    private func engineLabel(_ value: String) -> String {
+        engineOptions.first { $0.value == value }?.label ?? value
+    }
+
+    // 加载配置与实际生效引擎
+    private func load() {
+        Task {
+            do {
+                let d = try await APIClient.shared.douyinDetailGet()   // GET 配置+实际生效
+                let c = d.config ?? [:]                                // 配置键值对（可能为空）
+                let e = c["dy_detail_engine"] ?? "local"               // 回填引擎（默认 local）
+                engine = e.isEmpty ? "local" : e
+                cdpBase = c["dy_cdp_api_base"] ?? ""                   // 回填 CDP 地址
+                let t = c["dy_cdp_api_timeout"] ?? "60"                // 回填超时（默认 60）
+                cdpTimeout = t.isEmpty ? "60" : t
+                cdpFallback = (c["dy_cdp_fallback_local"] ?? "1") != "0"   // 回填降级开关（"1"为开）
+                let ch = c["dy_detail_channel"] ?? "web"               // 回填获取端（默认 web）
+                channel = ch.isEmpty ? "web" : ch
+                mobileFallback = (c["dy_mobile_fallback_web"] ?? "1") != "0"
+                let sm = c["dy_mobile_sign_mode"] ?? "nosign"          // 回填签名模式（默认 nosign）
+                signMode = sm.isEmpty ? "nosign" : sm
+                effectiveEngine = d.effectiveEngine ?? "local"         // 记录实际生效引擎
+                effectiveChannel = d.effectiveChannel ?? "web"         // 记录实际生效获取端
+                loadError = nil                                        // 清除错误
+            } catch { loadError = error.localizedDescription }         // 失败记录错误（展示重试态）
+            loading = false                                          // 关闭加载态
+        }
+    }
+
+    // 测试目标（区分两个接口的展示逻辑，对齐 Vue testDouyinDetail/testMobileChannel）
+    private enum TestTarget { case cdp, mobile }
+
+    // 保存配置：组装 dy_* 7键扁平 map（后端白名单校验后 upsert 进 system_settings）
+    private func save() {
+        saving = true                                               // 打开保存中态
+        Task {
+            do {
+                let timeout = min(max(Int(cdpTimeout.trimmingCharacters(in: .whitespaces)) ?? 60, 5), 300)   // 钳制 5~300 秒
+                try await APIClient.shared.douyinDetailSave([
+                    "dy_detail_channel": channel,                    // 获取端
+                    "dy_mobile_fallback_web": mobileFallback ? "1" : "0",   // 手机端降级开关
+                    "dy_mobile_sign_mode": signMode,                 // 手机端签名模式
+                    "dy_detail_engine": engine,                      // 引擎模式
+                    "dy_cdp_api_base": cdpBase.trimmingCharacters(in: .whitespaces),   // CDP 地址
+                    "dy_cdp_api_timeout": String(timeout),           // CDP 超时秒
+                    "dy_cdp_fallback_local": cdpFallback ? "1" : "0" // CDP 降级本地开关
+                ])
+                toast = "引擎设置保存成功"                             // 成功提示
+                load()                                              // 重载最新配置+实际生效
+            } catch { toast = error.localizedDescription }           // 失败提示
+            saving = false                                          // 关闭保存中态
+        }
+    }
+
+    // 测试：CDP 连接（/health 透传）或手机端通道（真实拉一条视频）
+    private func test(_ target: TestTarget) {
+        testing = true                                              // 打开测试中态
+        testResult = nil                                            // 清掉上次结果
+        Task {
+            do {
+                let r = try await target == .cdp
+                    ? APIClient.shared.douyinDetailTest()
+                    : APIClient.shared.douyinDetailTestMobile()     // 按目标调对应接口
+                if target == .cdp {                                 // CDP：结论+Chrome 就绪+请求统计
+                    let statText = (r.stats ?? [:]).isEmpty
+                        ? ""
+                        : (r.stats ?? [:]).map { "\($0.key)=\($0.value.value ?? "-")" }.joined(separator: "，")
+                    testResult = (
+                        true,
+                        "CDP 连接正常" + (r.chromeReady == false ? "（首次调用会自动拉起 Chrome，稍等 6 秒左右）" : ""),
+                        statText.isEmpty ? "" : "请求统计：\(statText)"
+                    )
+                } else {                                            // 手机端：结论+视频/赞/耗时/链路
+                    var parts: [String] = []
+                    if let id = r.awemeId, !id.isEmpty { parts.append("测试视频=\(id)") }
+                    if let dg = r.diggCount { parts.append("赞=\(dg)") }
+                    if let ms = r.costMs { parts.append("耗时=\(ms)ms") }
+                    if let lu = r.lastUsed, !lu.isEmpty { parts.append("链路=\(lu)") }
+                    testResult = (true, "手机端通道正常", parts.joined(separator: "，"))
+                }
+            } catch {                                               // 接口报错：红字展示原因
+                testResult = (false, "测试失败：\(error.localizedDescription)", "")
+            }
+            testing = false                                         // 关闭测试中态
+        }
     }
 }

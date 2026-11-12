@@ -282,6 +282,50 @@ final class APIClient {
     func setMultiLogin(_ req: SetMultiLoginReq) async throws { let _: PlainResp = try await perform("admin/users/set_multi_login", method: "POST", body: req) }
 
     func kickSession(_ req: KickSessionReq) async throws { let _: PlainResp = try await perform("admin/users/kick_session", method: "POST", body: req) }
+
+    // MARK: - 代理设置（2026-11-06 快代理动态IP/熔断直连/告警邮件，对齐后端 admin/DouyinProxySettings.php）
+
+    /// 读：代理配置 + 运行状态快照
+    func douyinProxyGet() async throws -> DouyinProxyData {
+        try await unwrap("admin/settings/douyin_proxy")                                    // GET 展开取 data
+    }
+
+    /// 存：扁平键值对（douyin_proxy_* 9键，后端白名单校验后 upsert）
+    func douyinProxySave(_ body: [String: String]) async throws {
+        let _: PlainResp = try await perform("admin/settings/douyin_proxy/save", method: "POST", body: body)   // POST 空 data 响应
+    }
+
+    /// 测：拉IP → 经代理访问回显接口 → 出口IP
+    func douyinProxyTest() async throws -> DouyinProxyTestResult {
+        try await unwrap("admin/settings/douyin_proxy/test", method: "POST", body: [String: String]())        // 空对象体（对齐 Vue 端）
+    }
+
+    /// 重置：清熔断计数/失败计数/IP缓存（改完配置后立刻生效）
+    func douyinProxyReset() async throws {
+        let _: PlainResp = try await perform("admin/settings/douyin_proxy/reset", method: "POST", body: [String: String]())   // 空对象体
+    }
+
+    // MARK: - 取数引擎（2026-11-12 Web引擎体系/手机端接口，对齐后端 admin/DouyinDetailSettings.php）
+
+    /// 读：dy_* 7键配置 + 实际生效引擎/获取端
+    func douyinDetailGet() async throws -> DouyinDetailData {
+        try await unwrap("admin/settings/douyin_detail")                                   // GET 展开取 data
+    }
+
+    /// 存：扁平键值对（后端白名单校验后 upsert 进 system_settings）
+    func douyinDetailSave(_ body: [String: String]) async throws {
+        let _: PlainResp = try await perform("admin/settings/douyin_detail/save", method: "POST", body: body)
+    }
+
+    /// 测：CDP 服务连接（/health 透传：Chrome 就绪状态与请求统计）
+    func douyinDetailTest() async throws -> DouyinDetailTestResult {
+        try await unwrap("admin/settings/douyin_detail/test", method: "POST", body: [String: String]())       // 空对象体（对齐 Vue 端）
+    }
+
+    /// 测：手机端通道（真实拉一条固定视频，回显实际链路与耗时）
+    func douyinDetailTestMobile() async throws -> DouyinDetailTestResult {
+        try await unwrap("admin/settings/douyin_detail/test_mobile", method: "POST", body: [String: String]()) // 空对象体
+    }
 }
 
 /// settingsGet 的任意值容器
