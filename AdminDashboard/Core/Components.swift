@@ -144,10 +144,12 @@ struct ApiStatCard: View {
     let success: Int?
     let failed: Int?
     let total: Int?
+    var deleted: Int? = nil             // 已删（fail_type 三分类口径，2026-11-15 对齐 web 端「已删」展示）
 
     private var totalV: Int { total ?? 0 }
     private var sV: Int { success ?? 0 }
     private var fV: Int { failed ?? 0 }
+    private var dV: Int { deleted ?? 0 }
     private var rate: Double { totalV > 0 ? Double(sV) / Double(totalV) : 0 }
 
     var body: some View {
@@ -159,6 +161,8 @@ struct ApiStatCard: View {
                     .foregroundStyle(LinearGradient(colors: [.white, Tech.cyan], startPoint: .leading, endPoint: .trailing))
                 HStack {
                     Text("成功 \(sV)").font(.system(size: 12)).foregroundColor(Tech.green)
+                    Spacer()
+                    Text("已删 \(dV)").font(.system(size: 12)).foregroundColor(Tech.yellow)
                     Spacer()
                     Text("失败 \(fV)").font(.system(size: 12)).foregroundColor(Tech.red)
                 }

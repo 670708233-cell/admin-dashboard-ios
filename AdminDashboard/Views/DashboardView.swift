@@ -140,54 +140,58 @@ struct DashboardView: View {
         Group {
             SectionTitle(text: "网页端API分类统计")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-                ApiStatCard(title: "查询", success: d.webRequests?.query?.success, failed: d.webRequests?.query?.failed, total: d.webRequests?.query?.total)
-                ApiStatCard(title: "刷新", success: d.webRequests?.refresh?.success, failed: d.webRequests?.refresh?.failed, total: d.webRequests?.refresh?.total)
-                ApiStatCard(title: "权重", success: d.webRequests?.weight?.success, failed: d.webRequests?.weight?.failed, total: d.webRequests?.weight?.total)
-                ApiStatCard(title: "公开查询", success: d.webRequests?.publicQuery?.success, failed: d.webRequests?.publicQuery?.failed, total: d.webRequests?.publicQuery?.total)
-                ApiStatCard(title: "API查询", success: d.webRequests?.apiQuery?.success, failed: d.webRequests?.apiQuery?.failed, total: d.webRequests?.apiQuery?.total)
-                ApiStatCard(title: "总计", success: d.webRequests?.total?.success, failed: d.webRequests?.total?.failed, total: d.webRequests?.total?.total)
+                ApiStatCard(title: "查询", success: d.webRequests?.query?.success, failed: d.webRequests?.query?.failed, total: d.webRequests?.query?.total, deleted: d.webRequests?.query?.deleted)
+                ApiStatCard(title: "刷新", success: d.webRequests?.refresh?.success, failed: d.webRequests?.refresh?.failed, total: d.webRequests?.refresh?.total, deleted: d.webRequests?.refresh?.deleted)
+                ApiStatCard(title: "权重", success: d.webRequests?.weight?.success, failed: d.webRequests?.weight?.failed, total: d.webRequests?.weight?.total, deleted: d.webRequests?.weight?.deleted)
+                ApiStatCard(title: "公开查询", success: d.webRequests?.publicQuery?.success, failed: d.webRequests?.publicQuery?.failed, total: d.webRequests?.publicQuery?.total, deleted: d.webRequests?.publicQuery?.deleted)
+                ApiStatCard(title: "API查询", success: d.webRequests?.apiQuery?.success, failed: d.webRequests?.apiQuery?.failed, total: d.webRequests?.apiQuery?.total, deleted: d.webRequests?.apiQuery?.deleted)
+                ApiStatCard(title: "未知", success: d.webRequests?.unknown?.success, failed: d.webRequests?.unknown?.failed, total: d.webRequests?.unknown?.total, deleted: d.webRequests?.unknown?.deleted)
+                ApiStatCard(title: "总计", success: d.webRequests?.total?.success, failed: d.webRequests?.total?.failed, total: d.webRequests?.total?.total, deleted: d.webRequests?.total?.deleted)
             }
 
             SectionTitle(text: "小程序API分类统计")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-                ApiStatCard(title: "视频", success: d.miniProgramRequests?.video?.success, failed: d.miniProgramRequests?.video?.failed, total: d.miniProgramRequests?.video?.total)
-                ApiStatCard(title: "权重", success: d.miniProgramRequests?.weight?.success, failed: d.miniProgramRequests?.weight?.failed, total: d.miniProgramRequests?.weight?.total)
-                ApiStatCard(title: "素材", success: d.miniProgramRequests?.material?.success, failed: d.miniProgramRequests?.material?.failed, total: d.miniProgramRequests?.material?.total)
-                ApiStatCard(title: "总计", success: d.miniProgramRequests?.total?.success, failed: d.miniProgramRequests?.total?.failed, total: d.miniProgramRequests?.total?.total)
+                ApiStatCard(title: "视频", success: d.miniProgramRequests?.video?.success, failed: d.miniProgramRequests?.video?.failed, total: d.miniProgramRequests?.video?.total, deleted: d.miniProgramRequests?.video?.deleted)
+                ApiStatCard(title: "权重", success: d.miniProgramRequests?.weight?.success, failed: d.miniProgramRequests?.weight?.failed, total: d.miniProgramRequests?.weight?.total, deleted: d.miniProgramRequests?.weight?.deleted)
+                ApiStatCard(title: "素材", success: d.miniProgramRequests?.material?.success, failed: d.miniProgramRequests?.material?.failed, total: d.miniProgramRequests?.material?.total, deleted: d.miniProgramRequests?.material?.deleted)
+                ApiStatCard(title: "未知", success: d.miniProgramRequests?.unknown?.success, failed: d.miniProgramRequests?.unknown?.failed, total: d.miniProgramRequests?.unknown?.total, deleted: d.miniProgramRequests?.unknown?.deleted)
+                ApiStatCard(title: "总计", success: d.miniProgramRequests?.total?.success, failed: d.miniProgramRequests?.total?.failed, total: d.miniProgramRequests?.total?.total, deleted: d.miniProgramRequests?.total?.deleted)
             }
 
             SectionTitle(text: "支付宝API分类统计")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-                ApiStatCard(title: "视频", success: d.alipayRequests?.video?.success, failed: d.alipayRequests?.video?.failed, total: d.alipayRequests?.video?.total)
-                ApiStatCard(title: "权重", success: d.alipayRequests?.weight?.success, failed: d.alipayRequests?.weight?.failed, total: d.alipayRequests?.weight?.total)
-                ApiStatCard(title: "素材", success: d.alipayRequests?.material?.success, failed: d.alipayRequests?.material?.failed, total: d.alipayRequests?.material?.total)
-                ApiStatCard(title: "总计", success: d.alipayRequests?.total?.success, failed: d.alipayRequests?.total?.failed, total: d.alipayRequests?.total?.total)
+                ApiStatCard(title: "视频", success: d.alipayRequests?.video?.success, failed: d.alipayRequests?.video?.failed, total: d.alipayRequests?.video?.total, deleted: d.alipayRequests?.video?.deleted)
+                ApiStatCard(title: "权重", success: d.alipayRequests?.weight?.success, failed: d.alipayRequests?.weight?.failed, total: d.alipayRequests?.weight?.total, deleted: d.alipayRequests?.weight?.deleted)
+                ApiStatCard(title: "素材", success: d.alipayRequests?.material?.success, failed: d.alipayRequests?.material?.failed, total: d.alipayRequests?.material?.total, deleted: d.alipayRequests?.material?.deleted)
+                ApiStatCard(title: "未知", success: d.alipayRequests?.unknown?.success, failed: d.alipayRequests?.unknown?.failed, total: d.alipayRequests?.unknown?.total, deleted: d.alipayRequests?.unknown?.deleted)
+                ApiStatCard(title: "总计", success: d.alipayRequests?.total?.success, failed: d.alipayRequests?.total?.failed, total: d.alipayRequests?.total?.total, deleted: d.alipayRequests?.total?.deleted)
             }
 
             SectionTitle(text: "安卓App API分类统计")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-                ApiStatCard(title: "查询", success: d.androidRequests?.query?.success, failed: d.androidRequests?.query?.failed, total: d.androidRequests?.query?.total)
-                ApiStatCard(title: "刷新", success: d.androidRequests?.refresh?.success, failed: d.androidRequests?.refresh?.failed, total: d.androidRequests?.refresh?.total)
-                ApiStatCard(title: "权重", success: d.androidRequests?.weight?.success, failed: d.androidRequests?.weight?.failed, total: d.androidRequests?.weight?.total)
-                ApiStatCard(title: "公开查询", success: d.androidRequests?.publicQuery?.success, failed: d.androidRequests?.publicQuery?.failed, total: d.androidRequests?.publicQuery?.total)
-                ApiStatCard(title: "API查询", success: d.androidRequests?.apiQuery?.success, failed: d.androidRequests?.apiQuery?.failed, total: d.androidRequests?.apiQuery?.total)
-                ApiStatCard(title: "总计", success: d.androidRequests?.total?.success, failed: d.androidRequests?.total?.failed, total: d.androidRequests?.total?.total)
+                ApiStatCard(title: "查询", success: d.androidRequests?.query?.success, failed: d.androidRequests?.query?.failed, total: d.androidRequests?.query?.total, deleted: d.androidRequests?.query?.deleted)
+                ApiStatCard(title: "刷新", success: d.androidRequests?.refresh?.success, failed: d.androidRequests?.refresh?.failed, total: d.androidRequests?.refresh?.total, deleted: d.androidRequests?.refresh?.deleted)
+                ApiStatCard(title: "权重", success: d.androidRequests?.weight?.success, failed: d.androidRequests?.weight?.failed, total: d.androidRequests?.weight?.total, deleted: d.androidRequests?.weight?.deleted)
+                ApiStatCard(title: "公开查询", success: d.androidRequests?.publicQuery?.success, failed: d.androidRequests?.publicQuery?.failed, total: d.androidRequests?.publicQuery?.total, deleted: d.androidRequests?.publicQuery?.deleted)
+                ApiStatCard(title: "API查询", success: d.androidRequests?.apiQuery?.success, failed: d.androidRequests?.apiQuery?.failed, total: d.androidRequests?.apiQuery?.total, deleted: d.androidRequests?.apiQuery?.deleted)
+                ApiStatCard(title: "未知", success: d.androidRequests?.unknown?.success, failed: d.androidRequests?.unknown?.failed, total: d.androidRequests?.unknown?.total, deleted: d.androidRequests?.unknown?.deleted)
+                ApiStatCard(title: "总计", success: d.androidRequests?.total?.success, failed: d.androidRequests?.total?.failed, total: d.androidRequests?.total?.total, deleted: d.androidRequests?.total?.deleted)
             }
 
             SectionTitle(text: "iOS App API分类统计")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-                ApiStatCard(title: "查询", success: d.iosRequests?.query?.success, failed: d.iosRequests?.query?.failed, total: d.iosRequests?.query?.total)
-                ApiStatCard(title: "刷新", success: d.iosRequests?.refresh?.success, failed: d.iosRequests?.refresh?.failed, total: d.iosRequests?.refresh?.total)
-                ApiStatCard(title: "权重", success: d.iosRequests?.weight?.success, failed: d.iosRequests?.weight?.failed, total: d.iosRequests?.weight?.total)
-                ApiStatCard(title: "公开查询", success: d.iosRequests?.publicQuery?.success, failed: d.iosRequests?.publicQuery?.failed, total: d.iosRequests?.publicQuery?.total)
-                ApiStatCard(title: "API查询", success: d.iosRequests?.apiQuery?.success, failed: d.iosRequests?.apiQuery?.failed, total: d.iosRequests?.apiQuery?.total)
-                ApiStatCard(title: "总计", success: d.iosRequests?.total?.success, failed: d.iosRequests?.total?.failed, total: d.iosRequests?.total?.total)
+                ApiStatCard(title: "查询", success: d.iosRequests?.query?.success, failed: d.iosRequests?.query?.failed, total: d.iosRequests?.query?.total, deleted: d.iosRequests?.query?.deleted)
+                ApiStatCard(title: "刷新", success: d.iosRequests?.refresh?.success, failed: d.iosRequests?.refresh?.failed, total: d.iosRequests?.refresh?.total, deleted: d.iosRequests?.refresh?.deleted)
+                ApiStatCard(title: "权重", success: d.iosRequests?.weight?.success, failed: d.iosRequests?.weight?.failed, total: d.iosRequests?.weight?.total, deleted: d.iosRequests?.weight?.deleted)
+                ApiStatCard(title: "公开查询", success: d.iosRequests?.publicQuery?.success, failed: d.iosRequests?.publicQuery?.failed, total: d.iosRequests?.publicQuery?.total, deleted: d.iosRequests?.publicQuery?.deleted)
+                ApiStatCard(title: "API查询", success: d.iosRequests?.apiQuery?.success, failed: d.iosRequests?.apiQuery?.failed, total: d.iosRequests?.apiQuery?.total, deleted: d.iosRequests?.apiQuery?.deleted)
+                ApiStatCard(title: "未知", success: d.iosRequests?.unknown?.success, failed: d.iosRequests?.unknown?.failed, total: d.iosRequests?.unknown?.total, deleted: d.iosRequests?.unknown?.deleted)
+                ApiStatCard(title: "总计", success: d.iosRequests?.total?.success, failed: d.iosRequests?.total?.failed, total: d.iosRequests?.total?.total, deleted: d.iosRequests?.total?.deleted)
             }
 
             SectionTitle(text: "今日请求")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 180), spacing: 12)], spacing: 12) {
-                ApiStatCard(title: "成功", success: d.todayRequests?.success, failed: 0, total: d.todayRequests?.total)
-                ApiStatCard(title: "失败", success: 0, failed: d.todayRequests?.failed, total: d.todayRequests?.total)
+                ApiStatCard(title: "今日请求", success: d.todayRequests?.success, failed: d.todayRequests?.failed, total: d.todayRequests?.total, deleted: d.todayRequests?.deleted)   // 三分类单卡（原成功/失败拆卡 hack 已弃）
             }
         }
     }
